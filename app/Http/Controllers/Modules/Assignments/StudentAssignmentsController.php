@@ -22,7 +22,7 @@ class StudentAssignmentsController extends Controller
         $assignments = Assignment::where('class_id', $user->class_id)
             ->where('is_published', true)
             ->with(['subject', 'teacher'])
-            ->with(['submissions' => function($query) use ($user) {
+            ->with(['submissions' => function ($query) use ($user) {
                 $query->where('student_id', $user->id);
             }])
             ->latest()
@@ -35,7 +35,6 @@ class StudentAssignmentsController extends Controller
             'pending' => AssignmentSubmission::where('student_id', $user->id)->whereIn('status', ['submitted', 'late'])->count(),
         ];
 
-        // FIX: Create a student-specific index view or use shared one
         return $this->renderView('modules.assignments.student-index', [
             'assignments' => $assignments,
             'stats' => $stats,
@@ -55,14 +54,19 @@ class StudentAssignmentsController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        // Verify assignment is published
+        if (!$assignment->is_published) {
+            abort(404, 'Assignment not found or not published.');
+        }
+
         $submission = AssignmentSubmission::where('assignment_id', $assignment->id)
             ->where('student_id', auth()->id())
             ->first();
 
-        // FIX: Use the shared assignments show view
         return $this->renderView('modules.assignments.show', [
             'assignment' => $assignment,
             'submission' => $submission,
+            'isStudent' => true, // Add this flag to identify student view
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true
@@ -128,6 +132,7 @@ class StudentAssignmentsController extends Controller
                 [
                     'submission_file' => $filePath,
                     'original_filename' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize(),
                     'submission_notes' => $request->submission_notes,
                     'submitted_at' => now(),
                     'status' => $status,
@@ -144,6 +149,26 @@ class StudentAssignmentsController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to submit assignment: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Download assignment file (teacher's file)
+     */
+    public function downloadAssignment(Assignment $assignment)
+    {
+        // Verify student is in the correct class
+        if ($assignment->class_id !== auth()->user()->class_id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!$assignment->assignment_file || !Storage::disk('public')->exists($assignment->assignment_file)) {
+            abort(404, 'Assignment file not found.');
+        }
+
+        return Storage::disk('public')->download(
+            $assignment->assignment_file,
+            $assignment->original_filename ?? 'assignment_file.' . pathinfo($assignment->assignment_file, PATHINFO_EXTENSION)
+        );
     }
 
     /**
@@ -169,6 +194,10 @@ class StudentAssignmentsController extends Controller
     /**
      * View submission history
      */
+    /**
+     * View submission history
+     */
+
     public function mySubmissions()
     {
         $submissions = AssignmentSubmission::where('student_id', auth()->id())
@@ -176,9 +205,17 @@ class StudentAssignmentsController extends Controller
             ->latest()
             ->paginate(10);
 
-        // FIX: Create a student submissions view or use shared one
+        $stats = [
+            'total' => $submissions->total(),
+            'graded' => AssignmentSubmission::where('student_id', auth()->id())->where('status', 'graded')->count(),
+            'pending' => AssignmentSubmission::where('student_id', auth()->id())->whereIn('status', ['submitted', 'late'])->count(),
+        ];
+        dd($submissions);
+
+        // FIX: Change 'submission' to 'submissions'  <-- This is your comment
         return $this->renderView('modules.assignments.submissions.student-index', [
-            'submissions' => $submissions,
+            'submissions' => $submissions, // This was 'submission' causing the error <-- And this
+            'stats' => $stats,
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true

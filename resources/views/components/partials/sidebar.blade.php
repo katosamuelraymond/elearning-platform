@@ -52,6 +52,13 @@
                                     icon="fas fa-list-check text-orange-400 dark:text-orange-300 text-xs"
                                     class="ajax-link ml-4"
                                 />
+                                <!-- FIXED ROUTE NAME -->
+                                <x-partials.sidebar-link
+                                    href="{{ route('student.assignments.my-submissions') }}"
+                                    label="My Submissions"
+                                    icon="fas fa-history text-orange-400 dark:text-orange-300 text-xs"
+                                    class="ajax-link ml-4"
+                                />
                             </div>
 
                             {{-- Exams Section --}}
@@ -97,7 +104,6 @@
                             class="ajax-link"
                         />
                         @break
-
                     {{-- ================= TEACHER ================= --}}
                     @case('teacher')
                         <x-partials.sidebar-link
