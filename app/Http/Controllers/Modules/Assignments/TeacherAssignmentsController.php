@@ -9,6 +9,7 @@ use App\Models\Academic\SchoolClass;
 use App\Models\Academic\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -66,8 +67,14 @@ class TeacherAssignmentsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+    /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
+        Log::info('=== ASSIGNMENT CREATION WITH FILE UPLOAD ===');
+
+        // Validate all fields
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'class_id' => 'required|exists:school_classes,id',
@@ -79,39 +86,74 @@ class TeacherAssignmentsController extends Controller
             'allowed_formats' => 'nullable|array',
             'max_file_size' => 'required|integer|min:1',
             'is_published' => 'boolean',
-            'assignment_file' => 'nullable|file|max:10240', // 10MB max - ADDED
+            'assignment_file' => 'nullable|file|max:10240', // <-- ADDED THIS VALIDATION
         ]);
 
-        $validated['teacher_id'] = Auth::id();
-        $validated['allowed_formats'] = $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'];
+        // Initialize file data
+        $fileData = [
+            'assignment_file' => null,
+            'original_filename' => null,
+            'file_size' => null
+        ];
 
-        // ADDED: Handle assignment file upload
-        if ($request->hasFile('assignment_file')) {
-            $file = $request->file('assignment_file');
-            $extension = $file->getClientOriginalExtension();
-            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-            $uniqueFileName = Str::slug($originalName) . '_' . time() . '.' . $extension;
+        // Handle file upload if present
+        if ($request->hasFile('assignment_file') && $request->file('assignment_file')->isValid()) {
+            Log::info('File upload detected and valid');
 
-            $filePath = $file->storeAs(
-                "assignments/files",
-                $uniqueFileName,
-                'public'
-            );
+            try {
+                $file = $request->file('assignment_file');
 
-            $validated['assignment_file'] = $filePath;
-            $validated['original_filename'] = $file->getClientOriginalName();
-            $validated['file_size'] = $file->getSize();
+                Log::info('Uploading file:', [
+                    'name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ]);
+
+                // Store the file
+                $path = $file->store('assignment_files', 'public');
+
+                Log::info('File stored successfully:', ['path' => $path]);
+
+                $fileData = [
+                    'assignment_file' => $path,
+                    'original_filename' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize()
+                ];
+
+            } catch (\Exception $e) {
+                Log::error('File upload failed:', ['error' => $e->getMessage()]);
+                // Continue without file - don't fail the assignment
+            }
+        } else {
+            Log::info('No file uploaded or file invalid');
         }
 
-        // Handle draft vs publish
+        // Prepare final data
+        $assignmentData = array_merge($validated, [
+            'teacher_id' => Auth::id(),
+            'allowed_formats' => $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'],
+        ], $fileData);
+
+        // Handle draft
         if ($request->has('draft')) {
-            $validated['is_published'] = false;
+            $assignmentData['is_published'] = false;
         }
 
-        Assignment::create($validated);
+        try {
+            $assignment = Assignment::create($assignmentData);
 
-        return redirect()->route('teacher.assignments.index')
-            ->with('success', 'Assignment created successfully!');
+            Log::info('Assignment created successfully:', [
+                'id' => $assignment->id,
+                'has_file' => !empty($assignment->assignment_file) ? 'YES' : 'NO',
+                'file_path' => $assignment->assignment_file,
+            ]);
+
+            return redirect()->route('teacher.assignments.index')
+                ->with('success', 'Assignment created successfully!');
+
+        } catch (\Exception $e) {
+            Log::error('Assignment creation failed:', ['error' => $e->getMessage()]);
+            return redirect()->back()->withInput()->with('error', 'Failed to create assignment.');
+        }
     }
 
     /**

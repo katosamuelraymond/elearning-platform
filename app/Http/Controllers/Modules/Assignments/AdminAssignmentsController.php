@@ -9,16 +9,33 @@ use App\Models\Academic\SchoolClass;
 use App\Models\Academic\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AdminAssignmentsController extends Controller
 {
     /**
+     * Check if user is admin
+     */
+    private function checkAdmin()
+    {
+        if (!Auth::check()) {
+            abort(403, 'Authentication required.');
+        }
+
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Admin privileges required. You are not authorized to access this page.');
+        }
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        $this->checkAdmin();
+
         $assignments = Assignment::with(['teacher', 'class', 'subject', 'submissions'])
             ->latest()
             ->paginate(10);
@@ -30,7 +47,7 @@ class AdminAssignmentsController extends Controller
             'submitted' => \App\Models\Assessment\AssignmentSubmission::count(),
         ];
 
-        return $this->renderView('modules.assignments.index', [
+        return view('modules.assignments.index', [
             'assignments' => $assignments,
             'stats' => $stats,
             'showNavbar' => true,
@@ -44,6 +61,8 @@ class AdminAssignmentsController extends Controller
      */
     public function create()
     {
+        $this->checkAdmin();
+
         $classes = SchoolClass::all();
         $subjects = Subject::all();
 
@@ -61,6 +80,11 @@ class AdminAssignmentsController extends Controller
      */
     public function store(Request $request)
     {
+        $this->checkAdmin();
+
+        Log::info('=== ADMIN ASSIGNMENT CREATION ===', ['user_id' => Auth::id(), 'user_role' => 'admin']);
+
+        // Validate all fields
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'class_id' => 'required|exists:school_classes,id',
@@ -72,40 +96,69 @@ class AdminAssignmentsController extends Controller
             'allowed_formats' => 'nullable|array',
             'max_file_size' => 'required|integer|min:1',
             'is_published' => 'boolean',
-            'assignment_file' => 'nullable|file|max:10240', // 10MB max - ADD THIS
+            'assignment_file' => 'nullable|file|max:10240',
         ]);
 
-        $validated['teacher_id'] = Auth::id();
-        $validated['allowed_formats'] = $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'];
+        // Initialize file data
+        $fileData = [
+            'assignment_file' => null,
+            'original_filename' => null,
+            'file_size' => null
+        ];
 
-        // ADD FILE UPLOAD HANDLING
-        if ($request->hasFile('assignment_file')) {
-            $file = $request->file('assignment_file');
-            $extension = $file->getClientOriginalExtension();
-            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-            $uniqueFileName = Str::slug($originalName) . '_' . time() . '.' . $extension;
+        // Handle file upload if present
+        if ($request->hasFile('assignment_file') && $request->file('assignment_file')->isValid()) {
+            Log::info('Admin file upload detected');
 
-            $filePath = $file->storeAs(
-                "assignments/files",
-                $uniqueFileName,
-                'public'
-            );
+            try {
+                $file = $request->file('assignment_file');
 
-            $validated['assignment_file'] = $filePath;
-            $validated['original_filename'] = $file->getClientOriginalName();
-            $validated['file_size'] = $file->getSize();
+                $fileData = [
+                    'assignment_file' => $file->store('assignment_files', 'public'),
+                    'original_filename' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize()
+                ];
+
+            } catch (\Exception $e) {
+                Log::error('Admin file upload failed:', ['error' => $e->getMessage()]);
+            }
         }
 
-        Assignment::create($validated);
+        // Prepare final data
+        $assignmentData = array_merge($validated, [
+            'teacher_id' => Auth::id(),
+            'allowed_formats' => $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'],
+        ], $fileData);
 
-        return redirect()->route('admin.assignments.index')
-            ->with('success', 'Assignment created successfully!');
+        // Handle draft
+        if ($request->has('draft')) {
+            $assignmentData['is_published'] = false;
+        }
+
+        try {
+            $assignment = Assignment::create($assignmentData);
+
+            Log::info('Admin assignment created successfully:', [
+                'admin_id' => Auth::id(),
+                'assignment_id' => $assignment->id,
+            ]);
+
+            return redirect()->route('admin.assignments.index')
+                ->with('success', 'Assignment created successfully!');
+
+        } catch (\Exception $e) {
+            Log::error('Admin assignment creation failed:', ['error' => $e->getMessage()]);
+            return redirect()->back()->withInput()->with('error', 'Failed to create assignment.');
+        }
     }
+
     /**
      * Display the specified resource.
      */
     public function show(Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $assignment->load(['teacher', 'class', 'subject', 'submissions.student']);
 
         return $this->renderView('modules.assignments.show', [
@@ -121,6 +174,8 @@ class AdminAssignmentsController extends Controller
      */
     public function edit(Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $classes = SchoolClass::all();
         $subjects = Subject::all();
 
@@ -139,6 +194,8 @@ class AdminAssignmentsController extends Controller
      */
     public function update(Request $request, Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'class_id' => 'required|exists:school_classes,id',
@@ -150,12 +207,12 @@ class AdminAssignmentsController extends Controller
             'allowed_formats' => 'nullable|array',
             'max_file_size' => 'required|integer|min:1',
             'is_published' => 'boolean',
-            'assignment_file' => 'nullable|file|max:10240', // ADD THIS
+            'assignment_file' => 'nullable|file|max:10240',
         ]);
 
         $validated['allowed_formats'] = $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'];
 
-        // ADD FILE UPLOAD HANDLING FOR UPDATE
+        // Handle file upload for update
         if ($request->hasFile('assignment_file')) {
             // Delete old file if exists
             if ($assignment->assignment_file && Storage::disk('public')->exists($assignment->assignment_file)) {
@@ -189,6 +246,8 @@ class AdminAssignmentsController extends Controller
      */
     public function destroy(Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $assignment->delete();
 
         return redirect()->route('admin.assignments.index')
@@ -200,6 +259,8 @@ class AdminAssignmentsController extends Controller
      */
     public function togglePublish(Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $assignment->update([
             'is_published' => !$assignment->is_published
         ]);
@@ -217,6 +278,8 @@ class AdminAssignmentsController extends Controller
      */
     public function submissions(Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $submissions = $assignment->submissions()
             ->with(['student', 'grader'])
             ->latest()
@@ -245,6 +308,8 @@ class AdminAssignmentsController extends Controller
      */
     public function showSubmission(Assignment $assignment, AssignmentSubmission $submission)
     {
+        $this->checkAdmin();
+
         $submission->load(['assignment', 'student', 'grader']);
 
         return $this->renderView('modules.assignments.submissions.show', [
@@ -261,6 +326,8 @@ class AdminAssignmentsController extends Controller
      */
     public function downloadSubmission(Assignment $assignment, AssignmentSubmission $submission)
     {
+        $this->checkAdmin();
+
         if (!Storage::disk('public')->exists($submission->submission_file)) {
             abort(404, 'File not found.');
         }
@@ -276,6 +343,8 @@ class AdminAssignmentsController extends Controller
      */
     public function editSubmission(Assignment $assignment, AssignmentSubmission $submission)
     {
+        $this->checkAdmin();
+
         $submission->load(['assignment', 'student']);
 
         return $this->renderView('modules.assignments.submissions.grade', [
@@ -292,6 +361,8 @@ class AdminAssignmentsController extends Controller
      */
     public function updateSubmission(Request $request, Assignment $assignment, AssignmentSubmission $submission)
     {
+        $this->checkAdmin();
+
         $request->validate([
             'points_obtained' => "required|integer|min:0|max:{$assignment->max_points}",
             'feedback' => 'nullable|string|max:2000',
@@ -315,6 +386,8 @@ class AdminAssignmentsController extends Controller
      */
     public function destroySubmission(Assignment $assignment, AssignmentSubmission $submission)
     {
+        $this->checkAdmin();
+
         // Delete file from storage
         if (Storage::disk('public')->exists($submission->submission_file)) {
             Storage::disk('public')->delete($submission->submission_file);
@@ -331,6 +404,8 @@ class AdminAssignmentsController extends Controller
      */
     public function bulkSubmissionAction(Request $request, Assignment $assignment)
     {
+        $this->checkAdmin();
+
         $request->validate([
             'action' => 'required|in:delete,mark_graded,mark_missing',
             'submission_ids' => 'required|array',
