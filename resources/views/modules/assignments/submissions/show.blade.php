@@ -5,7 +5,6 @@
 @section('content')
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
             <div class="mb-8">
                 <div class="flex justify-between items-start">
                     <div>
@@ -25,9 +24,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Main Content -->
                 <div class="lg:col-span-2 space-y-6">
-                    <!-- Submission Details -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                             <i class="fas fa-file-upload mr-3 text-blue-500"></i>
@@ -89,8 +86,8 @@
                         @endif
                     </div>
 
-                    <!-- Grading Information -->
-                    @if($submission->isGraded())
+                    {{-- CORRECTED: Check status directly since isGraded() method doesn't exist on the model --}}
+                    @if($submission->status == 'graded')
                         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                             <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                                 <i class="fas fa-graduation-cap mr-3 text-green-500"></i>
@@ -107,7 +104,8 @@
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Graded By</label>
-                                    <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ $submission->grader->name }}</p>
+                                    {{-- Grader is loaded via $submission->load(['grader']) in the controller --}}
+                                    <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ $submission->grader->name ?? 'N/A' }}</p>
                                     <p class="text-sm text-gray-600 dark:text-gray-400">
                                         {{ $submission->graded_at->format('M j, Y g:i A') }}
                                     </p>
@@ -126,9 +124,7 @@
                     @endif
                 </div>
 
-                <!-- Sidebar -->
                 <div class="space-y-6">
-                    <!-- Actions -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions</h3>
                         <div class="space-y-3">
@@ -141,7 +137,8 @@
                             <a href="{{ route('admin.assignments.submissions.edit', [$assignment, $submission]) }}"
                                class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center">
                                 <i class="fas fa-edit mr-2"></i>
-                                {{ $submission->isGraded() ? 'Regrade' : 'Grade' }}
+                                {{-- CORRECTED: Check status directly --}}
+                                {{ $submission->status == 'graded' ? 'Regrade' : 'Grade' }}
                             </a>
 
                             <form action="{{ route('admin.assignments.submissions.destroy', [$assignment, $submission]) }}" method="POST">
@@ -157,7 +154,6 @@
                         </div>
                     </div>
 
-                    <!-- Assignment Info -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Assignment Info</h3>
                         <div class="space-y-3">

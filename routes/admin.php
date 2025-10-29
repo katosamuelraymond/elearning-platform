@@ -28,7 +28,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     });
 
     // Assignments - COMPLETE CRUD OPERATIONS
-    // Admin Assignments - COMPLETE CRUD OPERATIONS
     Route::prefix('assignments')->name('assignments.')->group(function () {
         Route::get('/', [AdminAssignmentsController::class, 'index'])->name('index');
         Route::get('/create', [AdminAssignmentsController::class, 'create'])->name('create');
@@ -51,11 +50,24 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/{assignment}/download', [AdminAssignmentsController::class, 'download'])->name('download');
     });
 
-    // Exams
+    // Exams - COMPLETE CRUD OPERATIONS (Updated)
     Route::prefix('exams')->name('exams.')->group(function () {
+        // CRUD Routes
         Route::get('/', [AdminExamsController::class, 'index'])->name('index');
         Route::get('/create', [AdminExamsController::class, 'create'])->name('create');
-        Route::get('/edit/{id}', [AdminExamsController::class, 'edit'])->name('edit');
+        Route::post('/', [AdminExamsController::class, 'store'])->name('store');
+        Route::get('/{exam}', [AdminExamsController::class, 'show'])->name('show');
+        Route::get('/{exam}/edit', [AdminExamsController::class, 'edit'])->name('edit');
+        Route::put('/{exam}', [AdminExamsController::class, 'update'])->name('update');
+        Route::patch('/{exam}', [AdminExamsController::class, 'update']); // Alternative update
+        Route::delete('/{exam}', [AdminExamsController::class, 'destroy'])->name('destroy');
+
+        // Exam Actions
+        Route::patch('/{exam}/toggle-publish', [AdminExamsController::class, 'togglePublish'])->name('toggle-publish');
+
+        // Exam Attempts Management
+        Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
+        Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
     });
 
     // Quizzes

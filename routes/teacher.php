@@ -37,8 +37,23 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
     });
 
     Route::prefix('exams')->name('exams.')->group(function () {
+        // CRUD Routes (Owned by teacher)
         Route::get('/', [TeacherExamsController::class, 'index'])->name('index');
         Route::get('/create', [TeacherExamsController::class, 'create'])->name('create');
+        Route::post('/', [TeacherExamsController::class, 'store'])->name('store');
+        Route::get('/{exam}', [TeacherExamsController::class, 'show'])->name('show');
+        Route::get('/{exam}/edit', [TeacherExamsController::class, 'edit'])->name('edit');
+        Route::put('/{exam}', [TeacherExamsController::class, 'update'])->name('update');
+        Route::patch('/{exam}', [TeacherExamsController::class, 'update']);
+        Route::delete('/{exam}', [TeacherExamsController::class, 'destroy'])->name('destroy');
+
+        // Exam Actions
+        Route::patch('/{exam}/toggle-publish', [TeacherExamsController::class, 'togglePublish'])->name('toggle-publish');
+
+        // Exam Attempts Management (Viewing/Grading)
+        Route::get('/{exam}/attempts', [TeacherExamsController::class, 'attempts'])->name('attempts.index');
+        Route::get('/{exam}/attempts/{attempt}', [TeacherExamsController::class, 'showAttempt'])->name('attempts.show');
+        // Route::put('/{exam}/attempts/{attempt}/grade', [TeacherExamsController::class, 'gradeAttempt'])->name('attempts.grade'); // Future grading route
     });
 
     Route::prefix('quizzes')->name('quizzes.')->group(function () {

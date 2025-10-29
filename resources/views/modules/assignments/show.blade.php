@@ -5,7 +5,6 @@
 @section('content')
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
             <div class="flex justify-between items-center mb-8">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ $assignment->title }}</h1>
@@ -40,9 +39,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Main Content -->
                 <div class="lg:col-span-2 space-y-6">
-                    <!-- Assignment Details -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                             <i class="fas fa-info-circle mr-3 text-blue-500"></i>
@@ -93,52 +90,6 @@
                             </div>
                         </div>
 
-                        <!-- Attached File Section - ADDED THIS -->
-                        @if($assignment->assignment_file)
-                            <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center">
-                                    <i class="fas fa-paperclip mr-2 text-blue-500"></i>
-                                    Attached File
-                                </h3>
-                                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center space-x-3">
-                                            <div class="w-10 h-10 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center shadow-sm">
-                                                @php
-                                                    $extension = pathinfo($assignment->assignment_file, PATHINFO_EXTENSION);
-                                                    $fileIcons = [
-                                                        'pdf' => 'fas fa-file-pdf text-red-500',
-                                                        'doc' => 'fas fa-file-word text-blue-500',
-                                                        'docx' => 'fas fa-file-word text-blue-500',
-                                                        'txt' => 'fas fa-file-alt text-gray-500',
-                                                        'jpg' => 'fas fa-file-image text-green-500',
-                                                        'jpeg' => 'fas fa-file-image text-green-500',
-                                                        'png' => 'fas fa-file-image text-green-500',
-                                                        'zip' => 'fas fa-file-archive text-yellow-500',
-                                                        'rar' => 'fas fa-file-archive text-yellow-500'
-                                                    ];
-                                                    $fileIcon = $fileIcons[$extension] ?? 'fas fa-file text-gray-500';
-                                                @endphp
-                                                <i class="{{ $fileIcon }} text-lg"></i>
-                                            </div>
-                                            <div>
-                                                <h4 class="font-medium text-gray-900 dark:text-white text-sm">
-                                                    {{ basename($assignment->assignment_file) }}
-                                                </h4>
-                                                <p class="text-blue-600 dark:text-blue-400 text-xs">Click to download</p>
-                                            </div>
-                                        </div>
-                                        <a href="{{ asset('storage/' . $assignment->assignment_file) }}"
-                                           target="_blank"
-                                           class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center">
-                                            <i class="fas fa-download mr-2"></i>
-                                            Download
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-
                         @if($assignment->instructions)
                             <div class="mt-6">
                                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Instructions</h3>
@@ -158,7 +109,6 @@
                         @endif
                     </div>
 
-                    <!-- Submissions -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                             <i class="fas fa-users mr-3 text-green-500"></i>
@@ -174,6 +124,8 @@
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Submitted</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
+                                        {{-- 💡 ADDED: Action Header --}}
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
                                     </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -200,10 +152,26 @@
                                                     -
                                                 @endif
                                             </td>
+                                            {{-- 💡 ADDED: Action Cell with Grade/View Link --}}
+                                            <td class="px-4 py-3 text-sm">
+                                                <a href="{{ route('admin.assignments.submissions.edit', ['assignment' => $assignment->id, 'submission' => $submission->id]) }}"
+                                                   class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-medium">
+                                                    <i class="fas fa-marker mr-1"></i> {{ $submission->points_obtained ? 'View Grade' : 'Grade' }}
+                                                </a>
+                                            </td>
                                         </tr>
                                     @endforeach
                                     </tbody>
                                 </table>
+                            </div>
+
+                            {{-- 💡 ADDED: Dedicated button to the main submissions page --}}
+                            <div class="mt-4 flex justify-center">
+                                <a href="{{ route('admin.assignments.submissions', $assignment->id) }}"
+                                   class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                                    <i class="fas fa-list-ul mr-2"></i>
+                                    View Full Submissions List
+                                </a>
                             </div>
                         @else
                             <div class="text-center py-8">
@@ -215,9 +183,7 @@
                     </div>
                 </div>
 
-                <!-- Sidebar -->
                 <div class="space-y-6">
-                    <!-- Quick Stats -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Assignment Stats</h3>
                         <div class="space-y-4">
@@ -246,7 +212,6 @@
                         </div>
                     </div>
 
-                    <!-- Actions -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
                         <div class="space-y-3">
@@ -276,7 +241,6 @@
                         </div>
                     </div>
 
-                    <!-- Assignment Info -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Assignment Info</h3>
                         <div class="space-y-3">

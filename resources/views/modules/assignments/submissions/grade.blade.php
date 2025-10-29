@@ -5,12 +5,12 @@
 @section('content')
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
             <div class="mb-8">
                 <div class="flex justify-between items-start">
                     <div>
                         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-                            {{ $submission->isGraded() ? 'Regrade' : 'Grade' }} Submission
+                            {{-- CORRECTION 1: Check status directly --}}
+                            {{ $submission->status == 'graded' ? 'Regrade' : 'Grade' }} Submission
                         </h1>
                         <p class="text-gray-600 dark:text-gray-300 mt-2">
                             {{ $assignment->title }} • {{ $submission->student->name }}
@@ -24,7 +24,6 @@
                 </div>
             </div>
 
-            <!-- Grading Form -->
             <form action="{{ route('admin.assignments.submissions.update', [$assignment, $submission]) }}" method="POST">
                 @csrf
                 @method('PUT')
@@ -36,7 +35,6 @@
                     </h2>
 
                     <div class="space-y-6">
-                        <!-- Points -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Points Obtained *
@@ -53,7 +51,6 @@
                             @enderror
                         </div>
 
-                        <!-- Status -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Status *
@@ -69,7 +66,6 @@
                             @enderror
                         </div>
 
-                        <!-- Feedback -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Feedback
@@ -84,7 +80,6 @@
                     </div>
                 </div>
 
-                <!-- Student Submission Info -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                         <i class="fas fa-user-graduate mr-3 text-blue-500"></i>
@@ -125,7 +120,6 @@
                     @endif
                 </div>
 
-                <!-- Action Buttons -->
                 <div class="flex justify-between items-center">
                     <a href="{{ route('admin.assignments.submissions.show', [$assignment, $submission]) }}"
                        class="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center">
@@ -135,7 +129,8 @@
 
                     <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center">
                         <i class="fas fa-check mr-2"></i>
-                        {{ $submission->isGraded() ? 'Update Grade' : 'Submit Grade' }}
+                        {{-- CORRECTION 2: Check status directly --}}
+                        {{ $submission->status == 'graded' ? 'Update Grade' : 'Submit Grade' }}
                     </button>
                 </div>
             </form>

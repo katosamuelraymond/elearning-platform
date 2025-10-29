@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Modules\Assignments;
 
 use App\Http\Controllers\Controller;
+use App\Models\Academic\StudentClassAssignment; // 🛑 NEW: Required to find the student's class ID
 use App\Models\Assessment\Assignment;
 use App\Models\Assessment\AssignmentSubmission;
 use Illuminate\Http\Request;
@@ -12,28 +13,52 @@ use Illuminate\Support\Str;
 class StudentAssignmentsController extends Controller
 {
     /**
+     * Helper method to get the student's current class ID from the academic assignment table.
+     * @return int|null
+     */
+    protected function getCurrentClassId()
+    {
+        // Find the latest active class assignment for the student.
+        $studentClassAssignment = StudentClassAssignment::where('student_id', auth()->id())
+            ->where('status', 'active') // Only consider currently active class assignments
+            ->latest() // Get the latest record (in case of overlap or data issues)
+            ->first();
+
+        // Return the class_id or null if the student isn't assigned to an active class.
+        return $studentClassAssignment ? $studentClassAssignment->class_id : null;
+    }
+
+    /**
      * Display student's assignments
      */
     public function index()
     {
         $user = auth()->user();
+        $currentClassId = $this->getCurrentClassId(); // 🛑 FIX: Get class ID correctly
 
-        // Get assignments for student's class that are published
-        $assignments = Assignment::where('class_id', $user->class_id)
-            ->where('is_published', true)
-            ->with(['subject', 'teacher'])
-            ->with(['submissions' => function ($query) use ($user) {
-                $query->where('student_id', $user->id);
-            }])
-            ->latest()
-            ->paginate(10);
+        // 🛑 Handle case where student has no active class (should return empty list)
+        if (!$currentClassId) {
+            $assignments = Assignment::whereRaw('1=0')->paginate(10); // Returns an empty paginated collection
+            $stats = ['total' => 0, 'submitted' => 0, 'graded' => 0, 'pending' => 0];
+        } else {
+            // Get assignments for student's class that are published
+            // 🛑 FIX: Use $currentClassId for filtering
+            $assignments = Assignment::where('class_id', $currentClassId)
+                ->where('is_published', true)
+                ->with(['subject', 'teacher'])
+                ->with(['submissions' => function ($query) use ($user) {
+                    $query->where('student_id', $user->id);
+                }])
+                ->latest()
+                ->paginate(10);
 
-        $stats = [
-            'total' => $assignments->total(),
-            'submitted' => AssignmentSubmission::where('student_id', $user->id)->count(),
-            'graded' => AssignmentSubmission::where('student_id', $user->id)->where('status', 'graded')->count(),
-            'pending' => AssignmentSubmission::where('student_id', $user->id)->whereIn('status', ['submitted', 'late'])->count(),
-        ];
+            $stats = [
+                'total' => $assignments->total(),
+                'submitted' => AssignmentSubmission::where('student_id', $user->id)->count(),
+                'graded' => AssignmentSubmission::where('student_id', $user->id)->where('status', 'graded')->count(),
+                'pending' => AssignmentSubmission::where('student_id', $user->id)->whereIn('status', ['submitted', 'late'])->count(),
+            ];
+        }
 
         return $this->renderView('modules.assignments.student-index', [
             'assignments' => $assignments,
@@ -47,11 +72,18 @@ class StudentAssignmentsController extends Controller
     /**
      * Show assignment details and submission form
      */
+// In App\Http\Controllers\Modules\Assignments\StudentAssignmentsController.php
+
+    /**
+     * Show assignment details and submission form
+     */
     public function show(Assignment $assignment)
     {
+        $currentClassId = $this->getCurrentClassId();
+
         // Verify student is in the correct class
-        if ($assignment->class_id !== auth()->user()->class_id) {
-            abort(403, 'Unauthorized action.');
+        if (!$currentClassId || $assignment->class_id !== $currentClassId) {
+            abort(403, 'Unauthorized action or assignment not for your current class.');
         }
 
         // Verify assignment is published
@@ -63,10 +95,11 @@ class StudentAssignmentsController extends Controller
             ->where('student_id', auth()->id())
             ->first();
 
-        return $this->renderView('modules.assignments.show', [
+        // 🛑 FIX: Render the student-specific view
+        return $this->renderView('modules.assignments.student-show', [
             'assignment' => $assignment,
             'submission' => $submission,
-            'isStudent' => true, // Add this flag to identify student view
+            'isStudent' => true,
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true
@@ -78,8 +111,10 @@ class StudentAssignmentsController extends Controller
      */
     public function submit(Request $request, Assignment $assignment)
     {
-        // Verify student is in the correct class
-        if ($assignment->class_id !== auth()->user()->class_id) {
+        $currentClassId = $this->getCurrentClassId(); // 🛑 FIX: Get class ID correctly
+
+        // 🛑 FIX: Verify student is in the correct class
+        if (!$currentClassId || $assignment->class_id !== $currentClassId) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -156,8 +191,10 @@ class StudentAssignmentsController extends Controller
      */
     public function downloadAssignment(Assignment $assignment)
     {
-        // Verify student is in the correct class
-        if ($assignment->class_id !== auth()->user()->class_id) {
+        $currentClassId = $this->getCurrentClassId(); // 🛑 FIX: Get class ID correctly
+
+        // 🛑 FIX: Verify student is in the correct class
+        if (!$currentClassId || $assignment->class_id !== $currentClassId) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -176,6 +213,8 @@ class StudentAssignmentsController extends Controller
      */
     public function downloadSubmission(Assignment $assignment, AssignmentSubmission $submission)
     {
+        // NOTE: This method does NOT need $currentClassId because it checks ownership directly.
+
         // Check if student owns this submission
         if ($submission->student_id !== auth()->id()) {
             abort(403, 'Unauthorized action.');
@@ -194,12 +233,9 @@ class StudentAssignmentsController extends Controller
     /**
      * View submission history
      */
-    /**
-     * View submission history
-     */
-
     public function mySubmissions()
     {
+        // NOTE: This method is inherently student-specific and does not rely on class ID for filtering.
         $submissions = AssignmentSubmission::where('student_id', auth()->id())
             ->with(['assignment.subject', 'assignment.teacher', 'grader'])
             ->latest()
@@ -210,11 +246,10 @@ class StudentAssignmentsController extends Controller
             'graded' => AssignmentSubmission::where('student_id', auth()->id())->where('status', 'graded')->count(),
             'pending' => AssignmentSubmission::where('student_id', auth()->id())->whereIn('status', ['submitted', 'late'])->count(),
         ];
-        dd($submissions);
 
-        // FIX: Change 'submission' to 'submissions'  <-- This is your comment
+
         return $this->renderView('modules.assignments.submissions.student-index', [
-            'submissions' => $submissions, // This was 'submission' causing the error <-- And this
+            'submissions' => $submissions,
             'stats' => $stats,
             'showNavbar' => true,
             'showSidebar' => true,

@@ -29,9 +29,26 @@ Route::middleware('auth')->prefix('student')->name('student.')->group(function (
         Route::get('/{assignment}/download', [StudentAssignmentsController::class, 'downloadAssignment'])->name('download');
         Route::get('/{assignment}/submissions/{submission}/download', [StudentAssignmentsController::class, 'downloadSubmission'])->name('submissions.download');
     });
+
     Route::prefix('exams')->name('exams.')->group(function () {
+        // Exam List and History
         Route::get('/', [StudentExamsController::class, 'index'])->name('index');
-        Route::get('/take/{exam}', [StudentExamsController::class, 'show'])->name('take');
+        Route::get('/history', [StudentExamsController::class, 'myAttempts'])->name('history');
+
+        // Individual Exam Details (Pre-start)
+        Route::get('/{exam}', [StudentExamsController::class, 'show'])->name('show');
+
+        // Start/Resume Exam
+        Route::post('/{exam}/start', [StudentExamsController::class, 'start'])->name('start');
+
+        // Exam Interface (Take) - Note: This should ideally be outside standard layouts
+        Route::get('/{exam}/take/{attempt}', [StudentExamsController::class, 'take'])->name('take');
+
+        // Submit Exam Attempt
+        Route::post('/{exam}/submit/{attempt}', [StudentExamsController::class, 'submit'])->name('submit');
+
+        // View Results
+        Route::get('/{exam}/results/{attempt}', [StudentExamsController::class, 'results'])->name('results');
     });
 
     Route::prefix('quizzes')->name('quizzes.')->group(function () {

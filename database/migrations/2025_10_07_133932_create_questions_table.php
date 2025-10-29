@@ -15,12 +15,18 @@ return new class extends Migration
             $table->id();
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
-            $table->enum('type', ['mcq', 'true_false', 'short_answer', 'essay']);
+            // NOTE: fill_blank type added to align with controller validation
+            $table->enum('type', ['mcq', 'true_false', 'short_answer', 'essay', 'fill_blank']);
             $table->text('question_text');
             $table->text('explanation')->nullable();
             $table->enum('difficulty', ['easy', 'medium', 'hard'])->default('medium');
             $table->decimal('points', 5, 2)->default(1.00);
             $table->boolean('is_active')->default(true);
+
+            // ADDED: Fields to store non-MCQ correct answers/rubrics/details
+            $table->json('details')->nullable();
+            $table->text('correct_answer')->nullable();
+
             $table->timestamps();
         });
     }
