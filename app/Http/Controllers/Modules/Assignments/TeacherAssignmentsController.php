@@ -7,6 +7,7 @@ use App\Models\Assessment\Assignment;
 use App\Models\Assessment\AssignmentSubmission;
 use App\Models\Academic\SchoolClass;
 use App\Models\Academic\Subject;
+use App\Models\Academic\TeacherAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,60 @@ use Illuminate\Support\Str;
 
 class TeacherAssignmentsController extends Controller
 {
+    /**
+     * Get teacher's assigned subjects
+     */
+    private function getTeacherSubjects()
+    {
+        $teacherId = Auth::id();
+
+        // Get subjects from teacher assignments
+        $teacherAssignments = TeacherAssignment::where('teacher_id', $teacherId)
+            ->with(['subject'])
+            ->get();
+
+        $teacherSubjects = $teacherAssignments
+            ->pluck('subject')
+            ->filter() // Remove null subjects
+            ->unique('id') // Remove duplicates
+            ->values();
+
+        Log::info('Teacher subjects for assignments', [
+            'teacher_id' => $teacherId,
+            'subjects_count' => $teacherSubjects->count(),
+            'subject_names' => $teacherSubjects->pluck('name')
+        ]);
+
+        return $teacherSubjects;
+    }
+
+    /**
+     * Get teacher's assigned classes
+     */
+    private function getTeacherClasses()
+    {
+        $teacherId = Auth::id();
+
+        // Get classes from teacher assignments
+        $teacherAssignments = TeacherAssignment::where('teacher_id', $teacherId)
+            ->with(['class'])
+            ->get();
+
+        $teacherClasses = $teacherAssignments
+            ->pluck('class')
+            ->filter() // Remove null classes
+            ->unique('id') // Remove duplicates
+            ->values();
+
+        Log::info('Teacher classes for assignments', [
+            'teacher_id' => $teacherId,
+            'classes_count' => $teacherClasses->count(),
+            'class_names' => $teacherClasses->pluck('name')
+        ]);
+
+        return $teacherClasses;
+    }
+
     /**
      * Display teacher's assignments
      */
@@ -52,8 +107,14 @@ class TeacherAssignmentsController extends Controller
      */
     public function create()
     {
-        $classes = SchoolClass::all();
-        $subjects = Subject::all();
+        $classes = $this->getTeacherClasses();
+        $subjects = $this->getTeacherSubjects();
+
+        // Check if teacher has any assigned subjects/classes
+        if ($subjects->isEmpty() || $classes->isEmpty()) {
+            return redirect()->route('teacher.assignments.index')
+                ->with('error', 'You are not assigned to any subjects or classes. Please contact administrator.');
+        }
 
         return $this->renderView('modules.assignments.create', [
             'classes' => $classes,
@@ -67,14 +128,14 @@ class TeacherAssignmentsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         Log::info('=== ASSIGNMENT CREATION WITH FILE UPLOAD ===');
 
-        // Validate all fields
+        // First, validate the teacher can assign to this subject and class
+        $teacherSubjects = $this->getTeacherSubjects();
+        $teacherClasses = $this->getTeacherClasses();
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'class_id' => 'required|exists:school_classes,id',
@@ -86,8 +147,24 @@ class TeacherAssignmentsController extends Controller
             'allowed_formats' => 'nullable|array',
             'max_file_size' => 'required|integer|min:1',
             'is_published' => 'boolean',
-            'assignment_file' => 'nullable|file|max:10240', // <-- ADDED THIS VALIDATION
+            'assignment_file' => 'nullable|file|max:10240',
         ]);
+
+        // Verify the teacher is assigned to this subject
+        $isValidSubject = $teacherSubjects->contains('id', $validated['subject_id']);
+        $isValidClass = $teacherClasses->contains('id', $validated['class_id']);
+
+        if (!$isValidSubject) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'You are not assigned to teach this subject.');
+        }
+
+        if (!$isValidClass) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'You are not assigned to teach this class.');
+        }
 
         // Initialize file data
         $fileData = [
@@ -186,8 +263,8 @@ class TeacherAssignmentsController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        $classes = SchoolClass::all();
-        $subjects = Subject::all();
+        $classes = $this->getTeacherClasses();
+        $subjects = $this->getTeacherSubjects();
 
         return $this->renderView('modules.assignments.edit', [
             'assignment' => $assignment,
@@ -209,6 +286,10 @@ class TeacherAssignmentsController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        // First, validate the teacher can assign to this subject and class
+        $teacherSubjects = $this->getTeacherSubjects();
+        $teacherClasses = $this->getTeacherClasses();
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'class_id' => 'required|exists:school_classes,id',
@@ -220,12 +301,28 @@ class TeacherAssignmentsController extends Controller
             'allowed_formats' => 'nullable|array',
             'max_file_size' => 'required|integer|min:1',
             'is_published' => 'boolean',
-            'assignment_file' => 'nullable|file|max:10240', // ADDED
+            'assignment_file' => 'nullable|file|max:10240',
         ]);
+
+        // Verify the teacher is assigned to this subject and class
+        $isValidSubject = $teacherSubjects->contains('id', $validated['subject_id']);
+        $isValidClass = $teacherClasses->contains('id', $validated['class_id']);
+
+        if (!$isValidSubject) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'You are not assigned to teach this subject.');
+        }
+
+        if (!$isValidClass) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'You are not assigned to teach this class.');
+        }
 
         $validated['allowed_formats'] = $validated['allowed_formats'] ?? ['pdf', 'doc', 'docx'];
 
-        // ADDED: Handle assignment file upload for update
+        // Handle assignment file upload for update
         if ($request->hasFile('assignment_file')) {
             // Delete old file if exists
             if ($assignment->assignment_file && Storage::disk('public')->exists($assignment->assignment_file)) {
@@ -312,6 +409,7 @@ class TeacherAssignmentsController extends Controller
         );
     }
 
+    // ... rest of your methods remain the same (submissions, grading, etc.)
     // ==================== SUBMISSION METHODS ====================
 
     /**
@@ -454,7 +552,7 @@ class TeacherAssignmentsController extends Controller
 
         $submission->delete();
 
-        return redirect()->route('teacher.assignments.submissions', $assignment)
+        return redirect()->route('teacher.assignmissions.submissions', $assignment)
             ->with('success', 'Submission deleted successfully!');
     }
 

@@ -73,6 +73,12 @@
                                     icon="fas fa-file-lines text-red-400 dark:text-red-300 text-xs"
                                     class="ajax-link ml-4"
                                 />
+                                <x-partials.sidebar-link
+                                    href="{{ route('student.exams.history') }}"
+                                    label="Exam History"
+                                    icon="fas fa-clock-rotate-left text-red-400 dark:text-red-300 text-xs"
+                                    class="ajax-link ml-4"
+                                />
                             </div>
 
                             {{-- Quizzes Section --}}
@@ -104,7 +110,7 @@
                             class="ajax-link"
                         />
                         @break
-                    {{-- ================= TEACHER ================= --}}
+                        {{-- ================= TEACHER ================= --}}
                     @case('teacher')
                         <x-partials.sidebar-link
                             href="{{ route('teacher.dashboard') }}"
@@ -112,6 +118,20 @@
                             icon="fas fa-gauge-high text-blue-500 dark:text-blue-400"
                             class="ajax-link"
                         />
+                        <x-partials.sidebar-collapsible label="Question Bank" icon="fas fa-question-circle text-purple-500 dark:text-purple-400">
+                            <x-partials.sidebar-link
+                                href="{{ route('teacher.questions.index') }}"
+                                label="All Questions"
+                                icon="fas fa-list-check text-purple-400 dark:text-purple-300 text-xs"
+                                class="ajax-link"
+                            />
+                            <x-partials.sidebar-link
+                                href="{{ route('teacher.questions.create') }}"
+                                label="Create Question"
+                                icon="fas fa-plus-circle text-purple-300 dark:text-purple-200 text-xs"
+                                class="ajax-link"
+                            />
+                        </x-partials.sidebar-collapsible>
 
                         <x-partials.sidebar-collapsible label="Subjects" icon="fas fa-book-open-reader text-emerald-500 dark:text-emerald-400">
                             <x-partials.sidebar-link
@@ -200,7 +220,8 @@
                         />
                         @break
 
-                    {{-- ================= ADMIN ================= --}}
+                        {{-- ================= ADMIN ================= --}}
+
                     @case('admin')
                         <x-partials.sidebar-link
                             href="{{ route('admin.dashboard') }}"
@@ -208,6 +229,32 @@
                             icon="fas fa-gauge-high text-blue-500 dark:text-blue-400"
                             class="ajax-link"
                         />
+
+                        <!-- ADD TEACHER ASSIGNMENTS SECTION -->
+                        <x-partials.sidebar-collapsible label="Classes" icon="fas fa-chalkboard-teacher text-indigo-500 dark:text-indigo-400">
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.teacher-assignments.index') }}"
+                                label="Assign"
+                                icon="fas fa-user-check text-indigo-400 dark:text-indigo-300 text-xs"
+                                class="ajax-link"
+                            />
+                        </x-partials.sidebar-collapsible>
+
+                        <!-- ADD QUESTION BANK SECTION -->
+                        <x-partials.sidebar-collapsible label="Question Bank" icon="fas fa-question-circle text-purple-500 dark:text-purple-400">
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.questions.index') }}"
+                                label="All Questions"
+                                icon="fas fa-list-check text-purple-400 dark:text-purple-300 text-xs"
+                                class="ajax-link"
+                            />
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.questions.create') }}"
+                                label="Create Question"
+                                icon="fas fa-plus-circle text-purple-300 dark:text-purple-200 text-xs"
+                                class="ajax-link"
+                            />
+                        </x-partials.sidebar-collapsible>
 
                         <x-partials.sidebar-collapsible label="Subjects" icon="fas fa-book-open text-emerald-500 dark:text-emerald-400">
                             <x-partials.sidebar-link
@@ -225,7 +272,7 @@
                         </x-partials.sidebar-collapsible>
 
                         {{-- Combined Assessment Section --}}
-                        <x-partials.sidebar-collapsible label="Assessment" icon="fas fa-clipboard-check text-purple-500 dark:text-purple-400">
+                        <x-partials.sidebar-collapsible label="Assessment" icon="fas fa-clipboard-check text-orange-500 dark:text-orange-400">
                             {{-- Assignments Section --}}
                             <div class="ml-2 mb-3">
                                 <div class="flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
@@ -325,7 +372,6 @@
                                 class="ajax-link"
                             />
                         </x-partials.sidebar-collapsible>
-
                         @break
 
                     @default
@@ -378,7 +424,7 @@
             </div>
         </div>
 
-         <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
             <div class="text-center">
                 <div class="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg mx-auto mb-2 flex items-center justify-center shadow-md">
                     <i class="fas fa-graduation-cap text-white text-sm"></i>

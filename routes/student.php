@@ -19,14 +19,15 @@ Route::middleware('auth')->prefix('student')->name('student.')->group(function (
     // Student Assignments
     Route::prefix('assignments')->name('assignments.')->group(function () {
         Route::get('/', [StudentAssignmentsController::class, 'index'])->name('index');
-
-        // MOVE THIS LINE UP
         Route::get('/my-submissions', [StudentAssignmentsController::class, 'mySubmissions'])->name('my-submissions');
 
-        // ALL WILDCARD ROUTES GO AFTER SPECIFIC ONES
         Route::get('/{assignment}', [StudentAssignmentsController::class, 'show'])->name('show');
         Route::post('/{assignment}/submit', [StudentAssignmentsController::class, 'submit'])->name('submit');
-        Route::get('/{assignment}/download', [StudentAssignmentsController::class, 'downloadAssignment'])->name('download');
+
+        // Use downloadAssignment as the route name
+        Route::get('/{assignment}/download', [StudentAssignmentsController::class, 'downloadAssignment'])->name('downloadAssignment');
+
+        // Submission download route
         Route::get('/{assignment}/submissions/{submission}/download', [StudentAssignmentsController::class, 'downloadSubmission'])->name('submissions.download');
     });
 

@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Academic;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\User;
 use App\Models\Academic\SchoolClass;
 use App\Models\Academic\Stream;
 use App\Models\Academic\Subject;
-use App\Models\User;
 
 class TeacherAssignment extends Model
 {
     protected $fillable = [
         'teacher_id',
+        'subject_id',
         'class_id',
         'stream_id',
-        'subject_id',
         'academic_year',
         'role',
         'is_active'
@@ -26,7 +26,7 @@ class TeacherAssignment extends Model
     ];
 
     /**
-     * Get the teacher for the assignment.
+     * Get the teacher that owns the assignment.
      */
     public function teacher(): BelongsTo
     {
@@ -34,23 +34,7 @@ class TeacherAssignment extends Model
     }
 
     /**
-     * Get the class for the assignment.
-     */
-    public function class(): BelongsTo
-    {
-        return $this->belongsTo(SchoolClass::class, 'class_id');
-    }
-
-    /**
-     * Get the stream for the assignment.
-     */
-    public function stream(): BelongsTo
-    {
-        return $this->belongsTo(Stream::class, 'stream_id');
-    }
-
-    /**
-     * Get the subject for the assignment.
+     * Get the subject that owns the assignment.
      */
     public function subject(): BelongsTo
     {
@@ -58,27 +42,19 @@ class TeacherAssignment extends Model
     }
 
     /**
-     * Scope for class teacher assignments.
+     * Get the class that owns the assignment.
      */
-    public function scopeClassTeachers($query)
+    public function class(): BelongsTo
     {
-        return $query->where('role', 'class_teacher');
+        return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
     /**
-     * Scope for subject teacher assignments.
+     * Get the stream that owns the assignment.
      */
-    public function scopeSubjectTeachers($query)
+    public function stream(): BelongsTo
     {
-        return $query->where('role', 'subject_teacher');
-    }
-
-    /**
-     * Scope for head teacher assignments.
-     */
-    public function scopeHeadTeachers($query)
-    {
-        return $query->where('role', 'head_teacher');
+        return $this->belongsTo(Stream::class, 'stream_id');
     }
 
     /**
@@ -90,7 +66,7 @@ class TeacherAssignment extends Model
     }
 
     /**
-     * Scope for assignments in a specific academic year.
+     * Scope for specific academic year.
      */
     public function scopeForAcademicYear($query, $year)
     {

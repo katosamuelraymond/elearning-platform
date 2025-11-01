@@ -1,19 +1,29 @@
+@extends('layouts.app')
+
+@section('title', 'Exam Details - Lincoln eLearning')
+
 @section('content')
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Header -->
             <div class="flex justify-between items-center mb-8">
                 <div>
+
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ $exam->title }}</h1>
                     <p class="text-gray-600 dark:text-gray-300 mt-2">
                         {{ $exam->subject->name }} • {{ $exam->class->name }}
                     </p>
                 </div>
                 <div class="flex space-x-3">
-                    <a href="{{ route('student.exams.index') }}"
+                    <a href="{{ route('admin.exams.index') }}"
                        class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center">
                         <i class="fas fa-arrow-left mr-2"></i>
                         Back to Exams
+                    </a>
+                    <a href="{{ route('admin.exams.edit', $exam) }}"
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center">
+                        <i class="fas fa-edit mr-2"></i>
+                        Edit Exam
                     </a>
                 </div>
             </div>
@@ -70,10 +80,10 @@
                             </div>
 
                             <div>
-                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Your Attempts</h3>
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Attempts</h3>
                                 <p class="text-lg text-gray-900 dark:text-white mt-1 flex items-center">
-                                    <i class="fas fa-history mr-2 text-purple-500"></i>
-                                    {{ $exam->attempts->count() }}/{{ $exam->max_attempts }}
+                                    <i class="fas fa-users mr-2 text-purple-500"></i>
+                                    {{ $exam->attempts->count() }} attempts
                                 </p>
                             </div>
                         </div>
@@ -115,6 +125,14 @@
                                     <i class="fas fa-expand mr-3 {{ $exam->require_fullscreen ? 'text-green-500' : 'text-gray-400' }}"></i>
                                     <span class="text-sm text-gray-700 dark:text-gray-300">Require Fullscreen</span>
                                 </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-eye mr-3 {{ $exam->show_results ? 'text-green-500' : 'text-gray-400' }}"></i>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Show Results to Students</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-eye mr-3 {{ $exam->is_published ? 'text-green-500' : 'text-gray-400' }}"></i>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Published</span>
+                                </div>
                             </div>
                         </div>
 
@@ -137,77 +155,78 @@
                         @endif
                     </div>
 
-                    <!-- Your Attempt -->
-                    @if($attempt)
-                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                                <i class="fas fa-history mr-3 text-green-500"></i>
-                                Your Attempt
-                            </h2>
+                    <!-- Questions Section -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-question-circle mr-3 text-green-500"></i>
+                            Exam Questions ({{ $exam->questions->count() }})
+                        </h2>
 
-                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center shadow-sm">
-                                            <i class="fas fa-file-alt text-blue-500 text-xl"></i>
+                        <div class="space-y-4">
+                            @foreach($exam->questions as $index => $question)
+                                <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                                            Question {{ $index + 1 }}
+                                            <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                ({{ $question->pivot->points }} points)
+                                            </span>
+                                        </h3>
+                                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 capitalize">
+                                            {{ str_replace('_', ' ', $question->type) }}
+                                        </span>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <p class="text-gray-700 dark:text-gray-300">{{ $question->question_text }}</p>
+                                    </div>
+
+                                    @if($question->type === 'mcq')
+                                        <div class="space-y-2">
+                                            @foreach($question->options as $optionIndex => $option)
+                                                <div class="flex items-center space-x-3 p-2 rounded {{ $option->is_correct ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-700' }}">
+                                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400 w-6">
+                                                        {{ chr(65 + $optionIndex) }}.
+                                                    </span>
+                                                    <span class="text-gray-700 dark:text-gray-300 {{ $option->is_correct ? 'font-semibold text-green-700 dark:text-green-300' : '' }}">
+                                                        {{ $option->option_text }}
+                                                    </span>
+                                                    @if($option->is_correct)
+                                                        <span class="ml-auto text-green-600 dark:text-green-400 text-sm">
+                                                            <i class="fas fa-check"></i> Correct
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
                                         </div>
-                                        <div>
-                                            <h3 class="font-semibold text-gray-900 dark:text-white">Attempt Details</h3>
-                                            <p class="text-blue-600 dark:text-blue-400 text-sm">
-                                                Started on {{ $attempt->started_at->format('M j, Y \a\t g:i A') }}
+                                    @elseif($question->type === 'true_false')
+                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                            <p class="text-gray-700 dark:text-gray-300">
+                                                Correct Answer: <span class="font-semibold">{{ ucfirst($question->correct_answer) }}</span>
                                             </p>
                                         </div>
-                                    </div>
-                                    <span class="px-3 py-1 text-sm font-medium rounded-full
-                                {{ $attempt->status === 'graded' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                   ($attempt->status === 'submitted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                   'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200') }}">
-                                {{ ucfirst($attempt->status) }}
-                            </span>
+                                    @elseif($question->type === 'short_answer' && $question->details['expected_answer'])
+                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Expected Answer:</p>
+                                            <p class="text-gray-700 dark:text-gray-300">{{ $question->details['expected_answer'] }}</p>
+                                        </div>
+                                    @elseif($question->type === 'essay' && $question->details['grading_rubric'])
+                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Grading Rubric:</p>
+                                            <p class="text-gray-700 dark:text-gray-300">{{ $question->details['grading_rubric'] }}</p>
+                                        </div>
+                                    @elseif($question->type === 'fill_blank')
+                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Question with Blanks:</p>
+                                            <p class="text-gray-700 dark:text-gray-300 mb-2">{{ $question->details['blank_question'] }}</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Correct Answers:</p>
+                                            <p class="text-gray-700 dark:text-gray-300">{{ implode(', ', $question->details['blank_answers']) }}</p>
+                                        </div>
+                                    @endif
                                 </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400">Time Spent</p>
-                                        <p class="font-semibold text-gray-900 dark:text-white">
-                                            {{ floor($attempt->time_spent / 60) }}:{{ sprintf('%02d', $attempt->time_spent % 60) }}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400">Submitted At</p>
-                                        <p class="font-semibold text-gray-900 dark:text-white">
-                                            {{ $attempt->submitted_at ? $attempt->submitted_at->format('M j, g:i A') : 'Not submitted' }}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400">Score</p>
-                                        <p class="font-semibold text-gray-900 dark:text-white">
-                                            @if($attempt->total_score !== null)
-                                                {{ $attempt->total_score }}/{{ $exam->total_marks }}
-                                                @if($attempt->total_score >= $exam->passing_marks)
-                                                    <span class="text-green-600 dark:text-green-400 ml-1">✓</span>
-                                                @else
-                                                    <span class="text-red-600 dark:text-red-400 ml-1">✗</span>
-                                                @endif
-                                            @else
-                                                -
-                                            @endif
-                                        </p>
-                                    </div>
-                                </div>
-
-                                @if($attempt->status === 'submitted' && $exam->show_results)
-                                    <div class="mt-4 flex justify-center">
-                                        <a href="{{ route('student.exams.results', ['exam' => $exam, 'attempt' => $attempt]) }}"
-                                           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors duration-200">
-                                            <i class="fas fa-chart-bar mr-2"></i>
-                                            View Results
-                                        </a>
-                                    </div>
-                                @endif
-                            </div>
+                            @endforeach
                         </div>
-                    @endif
+                    </div>
                 </div>
 
                 <!-- Sidebar -->
@@ -225,116 +244,101 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Availability</span>
                                 <span class="font-semibold text-gray-900 dark:text-white capitalize">
-                                {{ $isActive ? 'Active' : ($isUpcoming ? 'Upcoming' : 'Completed') }}
-                            </span>
+                                    {{ $isActive ? 'Active' : ($isUpcoming ? 'Upcoming' : 'Completed') }}
+                                </span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600 dark:text-gray-400">Your Attempts</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Total Attempts</span>
                                 <span class="font-semibold text-gray-900 dark:text-white">
-                                {{ $exam->attempts->count() }}/{{ $exam->max_attempts }}
-                            </span>
+                                    {{ $exam->attempts->count() }}
+                                </span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Time Remaining</span>
                                 <span class="font-semibold text-gray-900 dark:text-white">
-                                @if($isActive)
+                                    @if($isActive)
                                         {{ $exam->end_time->diffForHumans(['parts' => 2]) }}
                                     @elseif($isUpcoming)
                                         Starts {{ $exam->start_time->diffForHumans() }}
                                     @else
                                         Ended
                                     @endif
-                            </span>
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Status</span>
+                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ $exam->is_published ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' }}">
+                                    {{ $exam->is_published ? 'Published' : 'Draft' }}
+                                </span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Action Card -->
+                    <!-- Quick Actions -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Take Exam</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+                        <div class="space-y-3">
+                            <a href="{{ route('admin.exams.attempts.index', $exam) }}"
+                               class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                <i class="fas fa-users mr-2"></i>
+                                View Attempts ({{ $exam->attempts->count() }})
+                            </a>
 
-                        @if($canTakeExam)
-                            @if($attempt && $attempt->status === 'in_progress')
-                                <div class="text-center">
-                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                        You have an exam in progress. Continue where you left off.
-                                    </p>
-                                    <a href="{{ route('student.exams.start', $exam) }}"
-                                       class="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                        <i class="fas fa-play mr-2"></i>
-                                        Continue Exam
-                                    </a>
-                                </div>
-                            @else
-                                <div class="text-center">
-                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                        Ready to start the exam? Make sure you have a stable internet connection.
-                                    </p>
-                                    <a href="{{ route('student.exams.start', $exam) }}"
-                                       class="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                        <i class="fas fa-play mr-2"></i>
-                                        Start Exam
-                                    </a>
-                                </div>
-                            @endif
-                        @elseif($isUpcoming)
-                            <div class="text-center">
-                                <i class="fas fa-clock text-3xl text-orange-500 mb-3"></i>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    This exam will be available on<br>
-                                    <strong>{{ $exam->start_time->format('F j, Y \a\t g:i A') }}</strong>
-                                </p>
-                            </div>
-                        @elseif($exam->attempts->count() >= $exam->max_attempts)
-                            <div class="text-center">
-                                <i class="fas fa-ban text-3xl text-red-500 mb-3"></i>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    You have used all your attempts for this exam.
-                                </p>
-                            </div>
-                        @elseif($isPast)
-                            <div class="text-center">
-                                <i class="fas fa-calendar-times text-3xl text-gray-500 mb-3"></i>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    This exam has ended and is no longer available.
-                                </p>
-                            </div>
-                        @else
-                            <div class="text-center">
-                                <i class="fas fa-exclamation-triangle text-3xl text-yellow-500 mb-3"></i>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    You are not eligible to take this exam at this time.
-                                </p>
-                            </div>
-                        @endif
+                            <form action="{{ route('admin.exams.toggle-publish', $exam) }}" method="POST" class="w-full">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit"
+                                        class="w-full {{ $exam->is_published ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-eye{{ $exam->is_published ? '-slash' : '' }} mr-2"></i>
+                                    {{ $exam->is_published ? 'Unpublish Exam' : 'Publish Exam' }}
+                                </button>
+                            </form>
+
+                            <a href="{{ route('admin.exams.edit', $exam) }}"
+                               class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                <i class="fas fa-edit mr-2"></i>
+                                Edit Exam
+                            </a>
+                        </div>
                     </div>
 
-                    <!-- Previous Attempts -->
+                    <!-- Recent Attempts -->
                     @if($exam->attempts->count() > 0)
                         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Previous Attempts</h3>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Attempts</h3>
                             <div class="space-y-3">
-                                @foreach($exam->attempts->sortByDesc('created_at') as $previousAttempt)
+                                @foreach($exam->attempts->sortByDesc('created_at')->take(5) as $attempt)
                                     <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                                         <div>
                                             <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                Attempt #{{ $loop->iteration }}
+                                                {{ $attempt->student->name }}
                                             </p>
                                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                {{ $previousAttempt->started_at->format('M j, g:i A') }}
+                                                {{ $attempt->started_at->format('M j, g:i A') }}
                                             </p>
                                         </div>
                                         <div class="text-right">
-                                <span class="text-sm font-medium
-                                    {{ $previousAttempt->total_score !== null && $previousAttempt->total_score >= $exam->passing_marks ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                    {{ $previousAttempt->total_score ?? '-' }}/{{ $exam->total_marks }}
-                                </span>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                                                {{ $previousAttempt->status }}
+                                            <span class="text-sm font-medium {{ $attempt->status === 'graded' ? 'text-green-600 dark:text-green-400' : ($attempt->status === 'submitted' ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400') }}">
+                                                {{ ucfirst($attempt->status) }}
+                                            </span>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                @if($attempt->score)
+                                                    {{ $attempt->score }}/{{ $exam->total_marks }}
+                                                @else
+                                                    In progress
+                                                @endif
                                             </p>
                                         </div>
                                     </div>
                                 @endforeach
+
+                                @if($exam->attempts->count() > 5)
+                                    <div class="text-center">
+                                        <a href="{{ route('admin.exams.attempts.index', $exam) }}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
+                                            View all {{ $exam->attempts->count() }} attempts
+                                        </a>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endif

@@ -1,9 +1,12 @@
 <?php
+
+use App\Http\Controllers\Modules\Teachers\AdminTeacherAssignmentController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Dashboard\AdminDashboardController;
 use App\Http\Controllers\Modules\Assignments\AdminAssignmentsController;
 use App\Http\Controllers\Modules\Subjects\AdminSubjectsController;
 use App\Http\Controllers\Modules\Exams\AdminExamsController;
+use App\Http\Controllers\Modules\Questions\AdminQuestionsController;
 use App\Http\Controllers\Modules\Quizzes\AdminQuizzesController;
 use App\Http\Controllers\Modules\Grades\AdminGradesController;
 use App\Http\Controllers\Modules\Resources\AdminResourcesController;
@@ -68,6 +71,36 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Exam Attempts Management
         Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
+    });
+
+    Route::prefix('questions')->name('questions.')->group(function () {
+        Route::get('/', [AdminQuestionsController::class, 'index'])->name('index');
+        Route::get('/create', [AdminQuestionsController::class, 'create'])->name('create');
+        Route::post('/', [AdminQuestionsController::class, 'store'])->name('store');
+        Route::get('/{question}', [AdminQuestionsController::class, 'show'])->name('show');
+        Route::get('/{question}/edit', [AdminQuestionsController::class, 'edit'])->name('edit');
+        Route::put('/{question}', [AdminQuestionsController::class, 'update'])->name('update');
+        Route::delete('/{question}', [AdminQuestionsController::class, 'destroy'])->name('destroy');
+        Route::patch('/{question}/toggle-status', [AdminQuestionsController::class, 'toggleStatus'])->name('toggle-status');
+    });
+
+    // Teacher Assignments - COMPLETE CRUD OPERATIONS
+    Route::prefix('teacher-assignments')->name('teacher-assignments.')->group(function () {
+        Route::get('/', [AdminTeacherAssignmentController::class, 'index'])->name('index');
+        Route::get('/create', [AdminTeacherAssignmentController::class, 'create'])->name('create');
+        Route::post('/', [AdminTeacherAssignmentController::class, 'store'])->name('store');
+        Route::get('/{assignment}/edit', [AdminTeacherAssignmentController::class, 'edit'])->name('edit');
+        Route::put('/{assignment}', [AdminTeacherAssignmentController::class, 'update'])->name('update');
+        Route::delete('/{assignment}', [AdminTeacherAssignmentController::class, 'destroy'])->name('destroy');
+        Route::post('/{assignment}/toggle-status', [AdminTeacherAssignmentController::class, 'toggleStatus'])->name('toggle-status');
+
+        // AJAX Routes for dynamic loading
+        Route::get('/{teacher}/assignments', [AdminTeacherAssignmentController::class, 'getTeacherAssignments'])->name('get-teacher');
+        Route::get('/{teacher}/available-subjects', [AdminTeacherAssignmentController::class, 'getAvailableSubjects'])->name('available-subjects');
+        Route::get('/{teacher}/available-classes', [AdminTeacherAssignmentController::class, 'getAvailableClasses'])->name('available-classes');
+
+        // Add this route for class streams
+        Route::get('/classes/{class}/streams', [AdminTeacherAssignmentController::class, 'getClassStreams'])->name('class-streams');
     });
 
     // Quizzes

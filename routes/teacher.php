@@ -4,6 +4,7 @@ use App\Http\Controllers\Dashboard\TeacherDashboardController;
 use App\Http\Controllers\Modules\Assignments\TeacherAssignmentsController;
 use App\Http\Controllers\Modules\Subjects\TeacherSubjectsController;
 use App\Http\Controllers\Modules\Exams\TeacherExamsController;
+use App\Http\Controllers\Modules\Questions\TeacherQuestionsController;
 use App\Http\Controllers\Modules\Quizzes\TeacherQuizzesController;
 use App\Http\Controllers\Modules\Grades\TeacherGradesController;
 use App\Http\Controllers\Modules\Resources\TeacherResourcesController;
@@ -14,6 +15,8 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
 
     Route::prefix('subjects')->name('subjects.')->group(function () {
         Route::get('/', [TeacherSubjectsController::class, 'index'])->name('index');
+        Route::get('/{subject}', [TeacherSubjectsController::class, 'show'])->name('show');
+        Route::get('/{subject}/lessons', [TeacherSubjectsController::class, 'lessons'])->name('lessons');
     });
 
     // Teacher Assignments
@@ -37,23 +40,28 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
     });
 
     Route::prefix('exams')->name('exams.')->group(function () {
-        // CRUD Routes (Owned by teacher)
         Route::get('/', [TeacherExamsController::class, 'index'])->name('index');
         Route::get('/create', [TeacherExamsController::class, 'create'])->name('create');
         Route::post('/', [TeacherExamsController::class, 'store'])->name('store');
         Route::get('/{exam}', [TeacherExamsController::class, 'show'])->name('show');
         Route::get('/{exam}/edit', [TeacherExamsController::class, 'edit'])->name('edit');
         Route::put('/{exam}', [TeacherExamsController::class, 'update'])->name('update');
-        Route::patch('/{exam}', [TeacherExamsController::class, 'update']);
         Route::delete('/{exam}', [TeacherExamsController::class, 'destroy'])->name('destroy');
-
-        // Exam Actions
-        Route::patch('/{exam}/toggle-publish', [TeacherExamsController::class, 'togglePublish'])->name('toggle-publish');
-
-        // Exam Attempts Management (Viewing/Grading)
         Route::get('/{exam}/attempts', [TeacherExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [TeacherExamsController::class, 'showAttempt'])->name('attempts.show');
-        // Route::put('/{exam}/attempts/{attempt}/grade', [TeacherExamsController::class, 'gradeAttempt'])->name('attempts.grade'); // Future grading route
+    });
+
+    // routes/teacher.php
+    Route::prefix('questions')->name('questions.')->group(function () {
+        Route::get('/', [TeacherQuestionsController::class, 'index'])->name('index');
+        Route::get('/create', [TeacherQuestionsController::class, 'create'])->name('create');
+        Route::post('/', [TeacherQuestionsController::class, 'store'])->name('store');
+        Route::get('/{question}', [TeacherQuestionsController::class, 'show'])->name('show');
+        Route::get('/{question}/edit', [TeacherQuestionsController::class, 'edit'])->name('edit');
+        Route::put('/{question}', [TeacherQuestionsController::class, 'update'])->name('update');
+        Route::delete('/{question}', [TeacherQuestionsController::class, 'destroy'])->name('destroy');
+        Route::post('/{question}/toggle-status', [TeacherQuestionsController::class, 'toggleStatus'])->name('toggle-status');
+        Route::get('/api/exam-questions', [TeacherQuestionsController::class, 'getQuestionsForExam'])->name('api.exam-questions');
     });
 
     Route::prefix('quizzes')->name('quizzes.')->group(function () {

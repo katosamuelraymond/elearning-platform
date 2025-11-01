@@ -3,6 +3,8 @@
 namespace App\Models;
 use App\Models\Academic\StudentClassAssignment;
 
+use App\Models\Academic\Subject;
+use App\Models\Academic\TeacherAssignment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -432,4 +434,20 @@ public function taughtSubjects()
         'subject_id'
     )->distinct();
 }
+
+    /**
+     * Get the subjects taught by the teacher through assignments
+     */
+    public function subjects()
+    {
+        return $this->hasManyThrough(
+            Subject::class,
+            TeacherAssignment::class,
+            'teacher_id', // Foreign key on TeacherAssignment table
+            'id', // Foreign key on Subject table
+            'id', // Local key on User table
+            'subject_id' // Local key on TeacherAssignment table
+        )->distinct();
+    }
+
 }

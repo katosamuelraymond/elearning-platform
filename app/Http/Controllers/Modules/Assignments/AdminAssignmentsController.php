@@ -32,7 +32,7 @@ class AdminAssignmentsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->checkAdmin();
 
@@ -47,13 +47,24 @@ class AdminAssignmentsController extends Controller
             'submitted' => \App\Models\Assessment\AssignmentSubmission::count(),
         ];
 
-        return view('modules.assignments.index', [
+        $data = [
             'assignments' => $assignments,
             'stats' => $stats,
-            'showNavbar' => true,
-            'showSidebar' => true,
-            'showFooter' => true
-        ]);
+        ];
+
+        // AJAX request → return only #main-content
+        if ($request->ajax()) {
+            return view('modules.assignments.partials.table', $data)
+                ->renderSections()['content'];
+        }
+
+        // Normal full page load
+        return view('modules.assignments.index', $data)
+            ->with([
+                'showNavbar' => true,
+                'showSidebar' => true,
+                'showFooter' => true,
+            ]);
     }
 
     /**

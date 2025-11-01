@@ -4,46 +4,77 @@ namespace App\Models\Assessment;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamAttempt extends Model
 {
     use HasFactory;
-
-    protected $table = 'exam_attempts';
 
     protected $fillable = [
         'exam_id',
         'student_id',
         'started_at',
         'submitted_at',
-        'status', // e.g., in_progress, submitted, graded
-        'score',
-        'answers', // Stores student responses, typically JSON
-        'time_spent', // in seconds
+        'time_spent',
+        'total_score',
+        'status',
+        'answers'
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'submitted_at' => 'datetime',
-        'answers' => 'array', // Must be cast as array/json to store complex data
-        'score' => 'decimal:2',
+        'answers' => 'array',
         'time_spent' => 'integer',
+        'total_score' => 'integer'
     ];
 
-    /**
-     * The exam this attempt belongs to.
-     */
-    public function exam()
+    // Relationships
+    public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
     }
 
-    /**
-     * The student who made this attempt.
-     */
-    public function student()
+    public function student(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'student_id');
+        return $this->belongsTo(\App\Models\User::class, 'student_id');
+    }
+
+    // Scopes
+    public function scopeSubmitted($query)
+    {
+        return $query->where('status', 'submitted');
+    }
+
+    public function scopeGraded($query)
+    {
+        return $query->where('status', 'graded');
+    }
+
+    public function scopeInProgress($query)
+    {
+        return $query->where('status', 'in_progress');
+    }
+
+    // Helpers
+    public function isSubmitted(): bool
+    {
+        return $this->status === 'submitted';
+    }
+
+    public function isGraded(): bool
+    {
+        return $this->status === 'graded';
+    }
+
+    public function isInProgress(): bool
+    {
+        return $this->status === 'in_progress';
+    }
+
+    public function getTimeRemaining($examDuration): int
+    {
+        $endTime = $this->started_at->addMinutes($examDuration);
+        return max(0, $endTime->diffInSeconds(now()));
     }
 }

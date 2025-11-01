@@ -12,9 +12,9 @@
 
             <form action="{{ route('admin.exams.store') }}" method="POST" id="exam-form">
                 @csrf
-                {{-- Hidden field to handle 'Save as Draft' functionality --}}
                 <input type="hidden" name="is_draft" id="is_draft" value="0">
 
+                <!-- Exam Details Card -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Exam Details</h2>
 
@@ -85,6 +85,7 @@
                     </div>
                 </div>
 
+                <!-- Timing & Settings -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Timing & Settings</h2>
 
@@ -139,6 +140,7 @@
                     </div>
                 </div>
 
+                <!-- Security Settings -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Security & Proctoring</h2>
 
@@ -173,6 +175,7 @@
                     </div>
                 </div>
 
+                <!-- Questions Section -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Exam Questions</h2>
@@ -182,6 +185,7 @@
                     </div>
 
                     <div id="questions-container">
+                        <!-- Questions will be added here dynamically -->
                     </div>
 
                     <button type="button" id="add-another-question" class="w-full py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center">
@@ -189,6 +193,7 @@
                     </button>
                 </div>
 
+                <!-- Action Buttons -->
                 <div class="flex justify-end space-x-4">
                     <button type="button" id="save-draft-btn" class="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                         Save as Draft
@@ -201,6 +206,7 @@
         </div>
     </div>
 
+    <!-- Question Template -->
     <template id="question-template">
         <div class="question-item border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-4">
             <div class="flex justify-between items-center mb-4">
@@ -214,7 +220,7 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question Type</label>
                     <select name="questions[0][type]" class="question-type w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                        <option value="multiple_choice">Multiple Choice</option>
+                        <option value="mcq">Multiple Choice</option>
                         <option value="true_false">True/False</option>
                         <option value="short_answer">Short Answer</option>
                         <option value="essay">Essay</option>
@@ -232,8 +238,8 @@
                 <textarea name="questions[0][question_text]" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" rows="3" placeholder="Enter your question here..." required></textarea>
             </div>
 
-            <div class="options-container space-y-3" data-type="multiple_choice">
-                {{-- IMPORTANT: Added option-group wrapper for JS functions --}}
+            <!-- Multiple Choice Options -->
+            <div class="options-container" data-type="mcq">
                 <div class="option-group space-y-3">
                     <div class="flex items-center option-item">
                         <input type="radio" name="questions[0][correct_answer]" value="0" class="mr-3 text-blue-600" checked>
@@ -245,7 +251,7 @@
                     <div class="flex items-center option-item">
                         <input type="radio" name="questions[0][correct_answer]" value="1" class="mr-3 text-blue-600">
                         <input type="text" name="questions[0][options][1]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option B" required>
-                        <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -255,20 +261,21 @@
                 </button>
             </div>
 
+            <!-- True/False Options -->
             <div class="options-container hidden" data-type="true_false">
                 <div class="space-y-3">
-                    {{-- Note: Renamed name to avoid collision with multiple_choice radio names --}}
                     <label class="flex items-center">
-                        <input type="radio" name="questions[0][correct_answer_tf]" value="true" class="mr-3 text-blue-600" checked>
+                        <input type="radio" name="questions[0][correct_answer]" value="true" class="mr-3 text-blue-600" checked>
                         <span class="text-gray-700 dark:text-gray-300">True</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="questions[0][correct_answer_tf]" value="false" class="mr-3 text-blue-600">
+                        <input type="radio" name="questions[0][correct_answer]" value="false" class="mr-3 text-blue-600">
                         <span class="text-gray-700 dark:text-gray-300">False</span>
                     </label>
                 </div>
             </div>
 
+            <!-- Short Answer -->
             <div class="options-container hidden" data-type="short_answer">
                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                     <p class="text-sm text-gray-600 dark:text-gray-300">Students will provide a short written answer to this question.</p>
@@ -279,6 +286,7 @@
                 </div>
             </div>
 
+            <!-- Essay -->
             <div class="options-container hidden" data-type="essay">
                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                     <p class="text-sm text-gray-600 dark:text-gray-300">Students will write an essay in response to this question.</p>
@@ -289,6 +297,7 @@
                 </div>
             </div>
 
+            <!-- Fill in the Blanks -->
             <div class="options-container hidden" data-type="fill_blank">
                 <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                     <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">Create fill-in-the-blank questions. Use <code class="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">[blank]</code> to indicate where the blank should appear.</p>
@@ -318,8 +327,16 @@
             const isDraftInput = document.getElementById('is_draft');
             const examForm = document.getElementById('exam-form');
 
-            // --- Core Functions ---
+            // Add Question Function
+            function addQuestion() {
+                const newQuestion = questionTemplate.content.cloneNode(true);
+                const questionElement = newQuestion.querySelector('.question-item');
 
+                questionsContainer.appendChild(questionElement);
+                updateQuestionNumbers();
+            }
+
+            // Update Question Numbers
             function updateQuestionNumbers() {
                 const questions = questionsContainer.querySelectorAll('.question-item');
                 questionCount = questions.length;
@@ -332,32 +349,16 @@
                     const inputs = question.querySelectorAll('[name]');
                     inputs.forEach(input => {
                         const oldName = input.getAttribute('name');
-                        // Use a regex to replace the old index ([0]) with the current index
-                        const newName = oldName.replace(/\[\d+\]/, `[${index}]`);
+                        const newName = oldName.replace(/questions\[\d+\]/, `questions[${index}]`);
                         input.setAttribute('name', newName);
                     });
-
-                    // Update option numbering inside the question if it's a multiple choice
-                    const typeSelect = question.querySelector('.question-type');
-                    if (typeSelect.value === 'multiple_choice') {
-                        updateOptionRadios(question);
-                    }
                 });
             }
 
-            function addQuestion() {
-                const newQuestion = questionTemplate.content.cloneNode(true);
-                const questionElement = newQuestion.querySelector('.question-item');
-
-                questionsContainer.appendChild(questionElement);
-
-                // Initial update to set the correct question index/number
-                updateQuestionNumbers();
-            }
-
-            function handleQuestionTypeChange(target) {
-                const questionItem = target.closest('.question-item');
-                const selectedType = target.value;
+            // Handle Question Type Change - FIXED VERSION
+            function handleQuestionTypeChange(selectElement) {
+                const questionItem = selectElement.closest('.question-item');
+                const selectedType = selectElement.value;
                 const optionsContainers = questionItem.querySelectorAll('.options-container');
 
                 // Hide all options containers
@@ -370,20 +371,76 @@
                 if (targetContainer) {
                     targetContainer.classList.remove('hidden');
                 }
+
+                // Clear all hidden form fields when type changes to prevent data contamination
+                clearHiddenFormFields(questionItem, selectedType);
             }
 
-            // --- Multiple Choice Option Management ---
+            // Clear hidden form fields to prevent data contamination
+            function clearHiddenFormFields(questionItem, selectedType) {
+                const questionIndex = Array.from(questionsContainer.querySelectorAll('.question-item')).indexOf(questionItem);
 
-            function getQuestionIndex(questionElement) {
-                const questionNumberText = questionElement.querySelector('.question-number').textContent;
-                return parseInt(questionNumberText) - 1;
+                // Define which fields should be cleared for each type
+                const fieldsToClear = {
+                    'mcq': ['expected_answer', 'grading_rubric', 'blank_question', 'blank_answers'],
+                    'true_false': ['options', 'expected_answer', 'grading_rubric', 'blank_question', 'blank_answers'],
+                    'short_answer': ['options', 'grading_rubric', 'blank_question', 'blank_answers'],
+                    'essay': ['options', 'expected_answer', 'blank_question', 'blank_answers'],
+                    'fill_blank': ['options', 'expected_answer', 'grading_rubric']
+                };
+
+                // Clear the fields that shouldn't be present for the current type
+                if (fieldsToClear[selectedType]) {
+                    fieldsToClear[selectedType].forEach(field => {
+                        const inputs = questionItem.querySelectorAll(`[name*="${field}"]`);
+                        inputs.forEach(input => {
+                            if (input.type === 'checkbox' || input.type === 'radio') {
+                                // Don't clear radio buttons for correct_answer as they're handled separately
+                                if (!input.name.includes('correct_answer')) {
+                                    input.checked = false;
+                                }
+                            } else if (input.type === 'select-multiple') {
+                                Array.from(input.options).forEach(option => {
+                                    option.selected = false;
+                                });
+                            } else {
+                                input.value = '';
+                            }
+                        });
+                    });
+                }
+
+                // Special handling for correct_answer field based on question type
+                const correctAnswerInputs = questionItem.querySelectorAll('[name*="correct_answer"]');
+
+                if (selectedType === 'mcq') {
+                    // For MCQ, ensure correct_answer is an integer (radio button index)
+                    // Reset to first option (value="0")
+                    correctAnswerInputs.forEach(input => {
+                        if (input.type === 'radio') {
+                            input.checked = (input.value === '0');
+                        }
+                    });
+                } else if (selectedType === 'true_false') {
+                    // For True/False, ensure correct_answer is 'true' or 'false'
+                    // Reset to 'true'
+                    correctAnswerInputs.forEach(input => {
+                        if (input.type === 'radio') {
+                            input.checked = (input.value === 'true');
+                        }
+                    });
+                }
+                // For other question types (short_answer, essay, fill_blank),
+                // the correct_answer is handled in the text fields (expected_answer, blank_answers, etc.)
             }
 
-            function addOptionToQuestion(questionElement) {
-                const optionGroup = questionElement.querySelector('.option-group');
+            // Add Option to Multiple Choice
+            function addOption(button) {
+                const questionItem = button.closest('.question-item');
+                const optionGroup = questionItem.querySelector('.option-group');
                 const options = optionGroup.querySelectorAll('.option-item');
                 const optionCount = options.length;
-                const questionIndex = getQuestionIndex(questionElement);
+                const questionIndex = Array.from(questionsContainer.querySelectorAll('.question-item')).indexOf(questionItem);
 
                 if (optionCount >= 6) {
                     alert('Maximum 6 options allowed per question.');
@@ -401,11 +458,13 @@
                 `;
 
                 optionGroup.appendChild(optionDiv);
-                updateOptionRadios(questionElement);
+                updateOptionButtons(questionItem);
             }
 
-            function removeOptionFromQuestion(questionElement, removeButton) {
-                const optionGroup = questionElement.querySelector('.option-group');
+            // Remove Option from Multiple Choice
+            function removeOption(button) {
+                const questionItem = button.closest('.question-item');
+                const optionGroup = questionItem.querySelector('.option-group');
                 const options = optionGroup.querySelectorAll('.option-item');
 
                 if (options.length <= 2) {
@@ -413,109 +472,147 @@
                     return;
                 }
 
-                const optionToRemove = removeButton.closest('.option-item');
-                if (optionToRemove) {
-                    // Check if the removed option was the checked one
-                    const wasChecked = optionToRemove.querySelector('input[type="radio"]').checked;
-                    optionToRemove.remove();
-
-                    // If the removed option was checked, check the first remaining option
-                    if (wasChecked) {
-                        const remainingOptions = optionGroup.querySelectorAll('.option-item');
-                        if (remainingOptions.length > 0) {
-                            remainingOptions[0].querySelector('input[type="radio"]').checked = true;
-                        }
-                    }
-
-                    updateOptionRadios(questionElement);
-                }
+                button.closest('.option-item').remove();
+                updateOptionButtons(questionItem);
             }
 
-            function updateOptionRadios(questionElement) {
-                const optionGroup = questionElement.querySelector('.option-group');
-                if (!optionGroup) return;
-
+            // Update Option Buttons State
+            function updateOptionButtons(questionItem) {
+                const optionGroup = questionItem.querySelector('.option-group');
                 const options = optionGroup.querySelectorAll('.option-item');
-                const questionIndex = getQuestionIndex(questionElement);
+                const removeButtons = optionGroup.querySelectorAll('.remove-option');
 
-                options.forEach((option, index) => {
-                    const radio = option.querySelector('input[type="radio"]');
-                    const textInput = option.querySelector('input[type="text"]');
-                    const removeBtn = option.querySelector('.remove-option');
-
-                    // Re-index radio and text input names/values
-                    if (radio) {
-                        radio.value = index;
-                        radio.name = `questions[${questionIndex}][correct_answer]`;
-                    }
-                    if (textInput) {
-                        textInput.name = `questions[${questionIndex}][options][${index}]`;
-                        textInput.placeholder = `Option ${String.fromCharCode(65 + index)}`;
-                    }
-
-                    // Enable/Disable remove button
-                    const canRemove = options.length > 2;
-                    if (removeBtn) {
-                        removeBtn.disabled = !canRemove;
-                        removeBtn.classList.toggle('disabled:opacity-50', !canRemove);
-                        removeBtn.classList.toggle('disabled:cursor-not-allowed', !canRemove);
-                    }
+                removeButtons.forEach((button, index) => {
+                    const isDisabled = options.length <= 2;
+                    button.disabled = isDisabled;
+                    button.classList.toggle('disabled:opacity-50', isDisabled);
+                    button.classList.toggle('disabled:cursor-not-allowed', isDisabled);
                 });
             }
 
-            // --- Event Delegation ---
+            // Form Validation
+            function validateForm() {
+                const questions = questionsContainer.querySelectorAll('.question-item');
 
-            // 1. Add Question Buttons
+                if (questions.length === 0) {
+                    alert('Please add at least one question to the exam.');
+                    return false;
+                }
+
+                let isValid = true;
+                questions.forEach((question, index) => {
+                    const questionText = question.querySelector('textarea[name*="question_text"]');
+                    if (!questionText || !questionText.value.trim()) {
+                        isValid = false;
+                        alert(`Question ${index + 1} is missing question text.`);
+                        questionText.focus();
+                        return;
+                    }
+
+                    // Validate question type specific requirements
+                    const questionType = question.querySelector('.question-type').value;
+
+                    if (questionType === 'mcq') {
+                        const options = question.querySelectorAll('input[name*="options"]');
+                        let emptyOptions = false;
+                        options.forEach(option => {
+                            if (!option.value.trim()) {
+                                emptyOptions = true;
+                                option.focus();
+                            }
+                        });
+                        if (emptyOptions) {
+                            isValid = false;
+                            alert(`Question ${index + 1} has empty options. Please fill all options.`);
+                            return;
+                        }
+                    }
+                });
+
+                return isValid;
+            }
+
+            // Event Listeners
             addQuestionBtn.addEventListener('click', addQuestion);
             addAnotherQuestionBtn.addEventListener('click', addQuestion);
 
-            // 2. Save as Draft Button
+            // Save as Draft
             saveDraftBtn.addEventListener('click', function(e) {
-                e.preventDefault(); // Prevent default submission
-                isDraftInput.value = '1'; // Set hidden field to indicate draft save
-                examForm.submit();
+                e.preventDefault();
+                isDraftInput.value = '1';
+                if (validateForm()) {
+                    examForm.submit();
+                }
             });
 
-            // 3. Event Delegation for dynamic elements inside questionsContainer
+            // Form Submission
+            examForm.addEventListener('submit', function(e) {
+                isDraftInput.value = '0';
+                if (!validateForm()) {
+                    e.preventDefault();
+                }
+            });
+
+            // Event Delegation for Dynamic Elements
             questionsContainer.addEventListener('click', function(e) {
                 const target = e.target;
-                const questionItem = target.closest('.question-item');
 
-                if (!questionItem) return;
-
-                // Handle Remove Question
+                // Remove Question
                 if (target.closest('.remove-question')) {
                     if (confirm('Are you sure you want to remove this question?')) {
-                        questionItem.remove();
-                        updateQuestionNumbers(); // Re-index everything
+                        target.closest('.question-item').remove();
+                        updateQuestionNumbers();
                     }
                 }
 
-                // Handle Add Option
+                // Add Option
                 if (target.closest('.add-option')) {
-                    addOptionToQuestion(questionItem);
+                    addOption(target.closest('.add-option'));
                 }
 
-                // Handle Remove Option
-                const removeOptionButton = target.closest('.remove-option');
-                if (removeOptionButton) {
-                    if (!removeOptionButton.disabled) {
-                        removeOptionFromQuestion(questionItem, removeOptionButton);
+                // Remove Option
+                if (target.closest('.remove-option')) {
+                    const removeBtn = target.closest('.remove-option');
+                    if (!removeBtn.disabled) {
+                        removeOption(removeBtn);
                     }
                 }
             });
 
             questionsContainer.addEventListener('change', function(e) {
-                // Handle Question Type Change
+                // Question Type Change
                 if (e.target.classList.contains('question-type')) {
                     handleQuestionTypeChange(e.target);
                 }
             });
 
-            // Add the first question when the page loads
-            if (questionCount === 0) {
-                addQuestion();
-            }
+            // Add first question
+            addQuestion();
         });
     </script>
+
+    <style>
+        .hidden {
+            display: none !important;
+        }
+        .disabled\:opacity-50:disabled {
+            opacity: 0.5;
+        }
+        .disabled\:cursor-not-allowed:disabled {
+            cursor: not-allowed;
+        }
+        .question-item {
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 @endsection

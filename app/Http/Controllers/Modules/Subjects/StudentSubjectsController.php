@@ -13,11 +13,42 @@ use Illuminate\Support\Facades\DB;
 class StudentSubjectsController extends Controller
 {
     /**
+     * Get the student record for the authenticated user with null checking
+     */
+    private function getStudent()
+    {
+        $user = Auth::user();
+
+        if (!$user->student) {
+            // Log the issue for debugging
+            \Log::warning('Student record not found for user', [
+                'user_id' => $user->id,
+                'user_type' => $user->type
+            ]);
+
+            throw new \Exception('Student profile not found. Please contact administrator.');
+        }
+
+        return $user->student;
+    }
+
+    /**
      * Display a listing of available subjects for student.
      */
     public function index(Request $request)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         // Get all active subjects
         $query = Subject::where('is_active', true);
@@ -40,7 +71,7 @@ class StudentSubjectsController extends Controller
         // Get paginated subjects
         $subjects = $query->latest()->paginate(12);
 
-        // Get student's enrolled subjects
+        // Get student's enrolled subjects with null checking
         $enrolledSubjects = $student->subjects()->wherePivot('status', 'enrolled')->get();
         $enrolledSubjectIds = $enrolledSubjects->pluck('id')->toArray();
 
@@ -78,7 +109,18 @@ class StudentSubjectsController extends Controller
      */
     public function mySubjects(Request $request)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         $query = $student->subjects()->where('is_active', true);
 
@@ -129,6 +171,19 @@ class StudentSubjectsController extends Controller
      */
     public function show(Request $request, Subject $subject)
     {
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
+
         // Check if subject is active
         if (!$subject->is_active) {
             if ($request->ajax()) {
@@ -139,8 +194,6 @@ class StudentSubjectsController extends Controller
             }
             return back()->with('error', 'This subject is not available.');
         }
-
-        $student = Auth::user()->student;
 
         // Check if student is enrolled in this subject
         $isEnrolled = $student->subjects()
@@ -180,7 +233,18 @@ class StudentSubjectsController extends Controller
      */
     public function enroll(Request $request, Subject $subject)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         // Check if subject is active
         if (!$subject->is_active) {
@@ -255,7 +319,18 @@ class StudentSubjectsController extends Controller
      */
     public function unenroll(Request $request, Subject $subject)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         try {
             DB::beginTransaction();
@@ -298,7 +373,18 @@ class StudentSubjectsController extends Controller
      */
     public function markCompleted(Request $request, Subject $subject)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         // Check if enrolled
         $enrollment = $student->subjects()
@@ -360,7 +446,18 @@ class StudentSubjectsController extends Controller
      */
     public function progress(Request $request)
     {
-        $student = Auth::user()->student;
+        try {
+            $student = $this->getStudent();
+        } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+            return redirect()->route('student.dashboard')
+                ->with('error', $e->getMessage());
+        }
 
         $enrolledCount = $student->subjects()->wherePivot('status', 'enrolled')->count();
         $completedCount = $student->subjects()->wherePivot('status', 'completed')->count();

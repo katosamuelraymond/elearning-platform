@@ -13,11 +13,19 @@
                         Manage and monitor all exams
                     </p>
                 </div>
-                <a href="{{ route(auth()->user()->isAdmin() ? 'admin.exams.create' : 'teacher.exams.create') }}"
-                   class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center">
-                    <i class="fas fa-plus mr-2"></i>
-                    Create New Exam
-                </a>
+                @if(auth()->user()->isAdmin())
+                    <a href="{{ route('admin.exams.create') }}"
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create New Exam
+                    </a>
+                @else
+                    <a href="{{ route('teacher.exams.create') }}"
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create New Exam
+                    </a>
+                @endif
             </div>
 
             <!-- Stats -->
@@ -82,7 +90,6 @@
                         @foreach($exams as $exam)
                             @php
                                 $isAdmin = auth()->user()->isAdmin();
-                                $baseRoute = $isAdmin ? 'admin.exams' : 'teacher.exams';
                                 $isActive = $exam->start_time <= now() && $exam->end_time >= now();
                                 $isUpcoming = $exam->start_time > now();
                                 $isPast = $exam->end_time < now();
@@ -93,9 +100,15 @@
                                     <div class="flex-1">
                                         <div class="flex items-center space-x-3 mb-2">
                                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                                <a href="{{ route($baseRoute . '.show', $exam) }}" class="hover:text-blue-600 dark:hover:text-blue-400">
-                                                    {{ $exam->title }}
-                                                </a>
+                                                @if($isAdmin)
+                                                    <a href="{{ route('admin.exams.show', $exam) }}" class="hover:text-blue-600 dark:hover:text-blue-400">
+                                                        {{ $exam->title }}
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('teacher.exams.show', $exam) }}" class="hover:text-blue-600 dark:hover:text-blue-400">
+                                                        {{ $exam->title }}
+                                                    </a>
+                                                @endif
                                             </h3>
                                             <span class="px-2 py-1 text-xs font-medium rounded-full
                                             {{ $exam->is_published ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' }}">
@@ -150,17 +163,45 @@
                                     </div>
 
                                     <div class="flex items-center space-x-3 ml-4">
-                                        <a href="{{ route($baseRoute . '.attempts', $exam) }}"
-                                           class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
-                                            <i class="fas fa-users mr-2"></i>
-                                            Attempts
-                                        </a>
+                                        @if($isAdmin)
+                                            <a href="{{ route('admin.exams.attempts.index', $exam) }}"
+                                               class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                                                <i class="fas fa-users mr-2"></i>
+                                                Attempts
+                                            </a>
 
-                                        <a href="{{ route($baseRoute . '.show', $exam) }}"
-                                           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                                            <i class="fas fa-eye mr-2"></i>
-                                            View
-                                        </a>
+                                            <!-- ADD THIS QUESTIONS BUTTON -->
+                                            <a href="{{ route('admin.exams.questions.index', $exam) }}"
+                                               class="inline-flex items-center px-3 py-2 border border-purple-300 dark:border-purple-600 text-sm font-medium rounded-md text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors duration-200">
+                                                <i class="fas fa-question-circle mr-2"></i>
+                                                Questions
+                                            </a>
+
+                                            <a href="{{ route('admin.exams.show', $exam) }}"
+                                               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                                <i class="fas fa-eye mr-2"></i>
+                                                View
+                                            </a>
+                                        @else
+                                            <a href="{{ route('teacher.exams.attempts.index', $exam) }}"
+                                               class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                                                <i class="fas fa-users mr-2"></i>
+                                                Attempts
+                                            </a>
+
+                                            <!-- ADD THIS QUESTIONS BUTTON FOR TEACHERS -->
+                                            <a href="{{ route('teacher.exams.questions.index', $exam) }}"
+                                               class="inline-flex items-center px-3 py-2 border border-purple-300 dark:border-purple-600 text-sm font-medium rounded-md text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors duration-200">
+                                                <i class="fas fa-question-circle mr-2"></i>
+                                                Questions
+                                            </a>
+
+                                            <a href="{{ route('teacher.exams.show', $exam) }}"
+                                               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                                <i class="fas fa-eye mr-2"></i>
+                                                View
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -176,11 +217,19 @@
                         <i class="fas fa-file-alt text-4xl text-gray-400 mb-4"></i>
                         <p class="text-gray-500 dark:text-gray-400 text-lg">No exams created yet</p>
                         <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">Get started by creating your first exam.</p>
-                        <a href="{{ route(auth()->user()->isAdmin() ? 'admin.exams.create' : 'teacher.exams.create') }}"
-                           class="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
-                            <i class="fas fa-plus mr-2"></i>
-                            Create Exam
-                        </a>
+                        @if(auth()->user()->isAdmin())
+                            <a href="{{ route('admin.exams.create') }}"
+                               class="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                                <i class="fas fa-plus mr-2"></i>
+                                Create Exam
+                            </a>
+                        @else
+                            <a href="{{ route('teacher.exams.create') }}"
+                               class="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                                <i class="fas fa-plus mr-2"></i>
+                                Create Exam
+                            </a>
+                        @endif
                     </div>
                 @endif
             </div>

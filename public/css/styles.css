@@ -1,0 +1,16 @@
+/* Emergency overflow fix */
+* {
+    max-width: 100vw;
+    box-sizing: border-box;
+}
+
+/* Force all elements to stay within viewport */
+body * {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Specific fix for tables and wide content */
+table {
+    max-width: 100vw !important;
+}

@@ -2,14 +2,11 @@
 
 namespace App\Models\Assessment;
 
-use App\Models\Academic\SchoolClass;
-use App\Models\Academic\Subject;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Exam extends Model
 {
@@ -32,7 +29,7 @@ class Exam extends Model
         'randomize_questions',
         'require_fullscreen',
         'show_results',
-        'is_published',
+        'is_published'
     ];
 
     protected $casts = [
@@ -42,48 +39,88 @@ class Exam extends Model
         'require_fullscreen' => 'boolean',
         'show_results' => 'boolean',
         'is_published' => 'boolean',
+        'duration' => 'integer',
+        'total_marks' => 'integer',
+        'passing_marks' => 'integer',
+        'max_attempts' => 'integer'
     ];
 
-    /**
-     * An Exam belongs to a Teacher (User).
-     */
+    // Relationships
     public function teacher(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'teacher_id');
+        return $this->belongsTo(\App\Models\User::class, 'teacher_id');
     }
 
-    /**
-     * An Exam belongs to a School Class.
-     */
     public function class(): BelongsTo
     {
-        return $this->belongsTo(SchoolClass::class, 'class_id');
+        return $this->belongsTo(\App\Models\Academic\SchoolClass::class, 'class_id');
     }
 
-    /**
-     * An Exam belongs to a Subject.
-     */
     public function subject(): BelongsTo
     {
-        return $this->belongsTo(Subject::class);
+        return $this->belongsTo(\App\Models\Academic\Subject::class);
     }
 
-    /**
-     * An Exam has many Questions through the exam_question pivot table.
-     */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(ExamAttempt::class);
+    }
+
     public function questions(): BelongsToMany
     {
         return $this->belongsToMany(Question::class, 'exam_question')
             ->withPivot('order', 'points')
-            ->orderBy('pivot_order')
+            ->orderBy('exam_question.order')
             ->withTimestamps();
     }
 
-    /**
-     * An Exam has many attempts.
-     */
-    public function attempts(): HasMany
+    // Scopes
+    public function scopePublished($query)
     {
-        return $this->hasMany(ExamAttempt::class);
+        return $query->where('is_published', true);
+    }
+
+    public function scopeUpcoming($query)
+    {
+        return $query->where('start_time', '>', now());
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('start_time', '<=', now())
+            ->where('end_time', '>=', now());
+    }
+
+    // Helpers
+    public function isActive(): bool
+    {
+        return $this->start_time <= now() && $this->end_time >= now();
+    }
+
+    public function isUpcoming(): bool
+    {
+        return $this->start_time > now();
+    }
+
+    public function isPast(): bool
+    {
+        return $this->end_time < now();
+    }
+
+    public function calculateTotalMarks(): float
+    {
+        return $this->questions->sum('pivot.points');
+    }
+
+    public function getFormattedDurationAttribute(): string
+    {
+        $hours = floor($this->duration / 60);
+        $minutes = $this->duration % 60;
+
+        if ($hours > 0) {
+            return "{$hours}h {$minutes}m";
+        }
+
+        return "{$minutes}m";
     }
 }

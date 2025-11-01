@@ -13,6 +13,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 // Import the Assessment Models
 use App\Models\Assessment\Question;
@@ -83,106 +85,137 @@ class AdminExamsController extends Controller
     {
         $this->checkAdmin();
 
-        // 1. Initial Validation
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'class_id' => 'required|exists:school_classes,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'instructions' => 'nullable|string',
-            'description' => 'nullable|string',
-            'type' => ['required', Rule::in('quiz', 'midterm', 'end_of_term', 'practice', 'mock')],
-            'duration' => 'required|integer|min:1',
-            'total_marks' => 'required|integer|min:1',
-            'passing_marks' => 'required|integer|min:0',
-            'start_time' => 'required|date',
-            'end_time' => ['required', 'date', 'after:start_time'],
-            'max_attempts' => 'required|integer|min:1',
+        // Use transaction to ensure data consistency
+        return DB::transaction(function () use ($request) {
+            try {
+                // 1. Initial Validation
+                $validated = $request->validate([
+                    'title' => 'required|string|max:255',
+                    'class_id' => 'required|exists:school_classes,id',
+                    'subject_id' => 'required|exists:subjects,id',
+                    'instructions' => 'nullable|string',
+                    'description' => 'nullable|string',
+                    'type' => ['required', Rule::in('quiz', 'midterm', 'end_of_term', 'practice', 'mock')],
+                    'duration' => 'required|integer|min:1',
+                    'total_marks' => 'required|integer|min:1',
+                    'passing_marks' => 'required|integer|min:0',
+                    'start_time' => 'required|date',
+                    'end_time' => ['required', 'date', 'after:start_time'],
+                    'max_attempts' => 'required|integer|min:1',
 
-            // Hidden field for 'Save as Draft' logic
-            'is_draft' => 'required|in:0,1',
+                    // Hidden field for 'Save as Draft' logic
+                    'is_draft' => 'required|in:0,1',
 
-            // General question array validation (questions are required unless saving as draft)
-            'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
-        ]);
+                    // General question array validation (questions are required unless saving as draft)
+                    'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
+                ]);
 
-        // 2. Process Checkbox and Draft Status
-        $data = array_merge($validated, [
-            'teacher_id' => Auth::id(),
-            'randomize_questions' => $request->has('randomize_questions'),
-            'require_fullscreen' => $request->has('require_fullscreen'),
-            'show_results' => $request->has('show_results'),
-            'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
-        ]);
+                // 2. Process Checkbox and Draft Status
+                $data = array_merge($validated, [
+                    'teacher_id' => Auth::id(),
+                    'randomize_questions' => $request->has('randomize_questions'),
+                    'require_fullscreen' => $request->has('require_fullscreen'),
+                    'show_results' => $request->has('show_results'),
+                    'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
+                ]);
 
-        // 3. Create Exam
-        $exam = Exam::create(Arr::except($data, ['questions', 'is_draft']));
+                // 3. Create Exam
+                $exam = Exam::create(Arr::except($data, ['questions', 'is_draft']));
 
-        // 4. Validate and Save Questions (conditional on questions existing)
-        if (isset($validated['questions'])) {
-            $this->validateAndSaveQuestions($exam, $validated['questions']);
-        }
+                // 4. Validate and Save Questions (conditional on questions existing)
+                if (isset($validated['questions']) && !empty($validated['questions'])) {
+                    $this->validateAndSaveQuestions($exam, $validated['questions']);
+                }
 
-        $message = $exam->is_published ? 'Exam created and published successfully!' : 'Exam saved as draft successfully!';
+                $message = $exam->is_published ? 'Exam created and published successfully!' : 'Exam saved as draft successfully!';
 
-        return redirect()->route('admin.exams.index')
-            ->with('success', $message);
+                return redirect()->route('admin.exams.index')
+                    ->with('success', $message);
+
+            } catch (ValidationException $e) {
+                // Log the validation errors for debugging
+                Log::error('Exam creation validation failed:', ['errors' => $e->errors()]);
+                throw $e; // Re-throw to let Laravel handle the redirect with errors
+            } catch (\Exception $e) {
+                // Log any other errors
+                Log::error('Exam creation failed:', ['error' => $e->getMessage()]);
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Failed to create exam. Please try again.');
+            }
+        });
     }
 
     /**
      * Validate and save the nested question data to the database, ensuring schema compliance.
-     * @param Exam $exam
-     * @param array $questionsData
-     * @throws \Illuminate\Validation\ValidationException
      */
     private function validateAndSaveQuestions(Exam $exam, array $questionsData)
     {
-        // Define validation rules for each question item dynamically
-        $rules = [
-            // Using 'mcq' to match the migration enum and the robust Rule::in()
-            '*.type' => ['required', Rule::in('mcq', 'true_false', 'short_answer', 'essay', 'fill_blank')],
-            '*.points' => ['required', 'numeric', 'min:0.5', 'max:100'],
-            '*.question_text' => ['required', 'string'],
+        // Log the incoming data for debugging
+        Log::info('Questions data received:', ['questions' => $questionsData]);
 
-            // Multiple Choice (mcq) - Using fully qualified paths for required_if
-            '*.correct_answer' => ['required_if:questions.*.type,mcq', 'integer', 'min:0'],
-            '*.options' => ['required_if:questions.*.type,mcq', 'array', 'min:2', 'max:6'],
-            '*.options.*' => ['required_if:questions.*.type,mcq', 'string', 'max:500'],
+        // Define validation rules for each question item
+        $rules = [];
 
-            // True/False
-            '*.correct_answer_tf' => ['required_if:questions.*.type,true_false', Rule::in('true', 'false')],
+        foreach ($questionsData as $index => $question) {
+            $questionType = $question['type'] ?? null;
 
-            // Fill in the Blanks
-            '*.blank_question' => ['required_if:questions.*.type,fill_blank', 'string'],
-            '*.blank_answers' => ['required_if:questions.*.type,fill_blank', 'string'], // Comma-separated
-        ];
+            // Base rules for all questions
+            $rules["{$index}.type"] = ['required', Rule::in(['mcq', 'true_false', 'short_answer', 'essay', 'fill_blank'])];
+            $rules["{$index}.points"] = ['required', 'numeric', 'min:0.5', 'max:100'];
+            $rules["{$index}.question_text"] = ['required', 'string'];
 
-        // Manually validate the array of questions
-        $validator = Validator::make(['questions' => $questionsData], [
-            'questions' => 'array',
-            'questions.*' => $rules,
-        ]);
+            // Type-specific rules
+            switch ($questionType) {
+                case 'mcq':
+                    $rules["{$index}.correct_answer"] = ['required', 'integer', 'min:0'];
+                    $rules["{$index}.options"] = ['required', 'array', 'min:2', 'max:6'];
+                    $rules["{$index}.options.*"] = ['required', 'string', 'max:500'];
+                    break;
+
+                case 'true_false':
+                    $rules["{$index}.correct_answer"] = ['required', Rule::in(['true', 'false'])];
+                    break;
+
+                case 'short_answer':
+                    $rules["{$index}.expected_answer"] = ['nullable', 'string'];
+                    break;
+
+                case 'essay':
+                    $rules["{$index}.grading_rubric"] = ['nullable', 'string'];
+                    break;
+
+                case 'fill_blank':
+                    $rules["{$index}.blank_question"] = ['required', 'string'];
+                    $rules["{$index}.blank_answers"] = ['required', 'string'];
+                    break;
+            }
+        }
+
+        // Validate the questions array
+        $validator = Validator::make($questionsData, $rules);
 
         if ($validator->fails()) {
+            // Log validation errors
+            Log::error('Question validation failed:', ['errors' => $validator->errors()->toArray()]);
             throw new ValidationException($validator);
         }
 
-        $validatedQuestions = $validator->validated()['questions'];
+        $validatedQuestions = $validator->validated();
 
         // Save questions
         $questionOrder = 0;
         foreach ($validatedQuestions as $qData) {
-
             $details = [];
             $correctAnswer = null;
 
-            // 1. Prepare question data based on type
+            // Prepare question data based on type
             switch ($qData['type']) {
                 case 'mcq':
-                    // correct_answer here is the INDEX of the correct option
                     $correctAnswer = $qData['correct_answer'];
                     break;
                 case 'true_false':
-                    $correctAnswer = $qData['correct_answer_tf'];
+                    $correctAnswer = $qData['correct_answer'];
                     break;
                 case 'short_answer':
                     $details['expected_answer'] = $qData['expected_answer'] ?? null;
@@ -193,31 +226,33 @@ class AdminExamsController extends Controller
                     break;
                 case 'fill_blank':
                     $details['blank_question'] = $qData['blank_question'];
-                    // Store comma-separated answers as a JSON array string
                     $blankAnswers = array_map('trim', explode(',', $qData['blank_answers'] ?? ''));
                     $details['blank_answers'] = $blankAnswers;
                     $correctAnswer = json_encode($blankAnswers);
                     break;
             }
 
-            // 2. Create the base Question record (Reusable Question Pool)
+            // Create the base Question record
             $question = Question::create([
                 'subject_id' => $exam->subject_id,
                 'created_by' => Auth::id(),
                 'type' => $qData['type'],
                 'points' => $qData['points'],
                 'question_text' => $qData['question_text'],
-                'details' => $details, // Stored as JSON
-                'correct_answer' => $correctAnswer, // Stored as TEXT
+                'details' => !empty($details) ? $details : null,
+                'correct_answer' => $correctAnswer,
             ]);
 
-            // 3. Attach the new Question to the Exam via the pivot table (exam_question)
+            // Log the created question
+            Log::info('Question created:', ['question_id' => $question->id, 'type' => $qData['type']]);
+
+            // Attach to exam
             $exam->questions()->attach($question->id, [
                 'order' => $questionOrder++,
                 'points' => $qData['points']
             ]);
 
-            // 4. Handle Multiple Choice Options (save to question_options table)
+            // Handle Multiple Choice Options
             if ($qData['type'] === 'mcq' && !empty($qData['options'])) {
                 foreach ($qData['options'] as $index => $optionText) {
                     QuestionOption::create([
@@ -227,10 +262,16 @@ class AdminExamsController extends Controller
                         'order' => $index,
                     ]);
                 }
+                Log::info('MCQ options created:', ['question_id' => $question->id, 'options_count' => count($qData['options'])]);
             }
         }
+
+        Log::info('All questions saved successfully for exam:', ['exam_id' => $exam->id, 'questions_count' => count($validatedQuestions)]);
     }
 
+    /**
+     * Display the specified resource.
+     */
     /**
      * Display the specified resource.
      */
@@ -241,8 +282,14 @@ class AdminExamsController extends Controller
         // Eager load questions and their options
         $exam->load(['teacher', 'class', 'subject', 'attempts.student', 'questions' => fn ($q) => $q->with('options')]);
 
-        return $this->renderView('modules.exams.show', [
+        // For admin view, we don't need attempt data since it's not student-specific
+        $attempt = null;
+        $canTakeExam = false;
+
+        return $this->renderView('modules.exams.student-show', [
             'exam' => $exam,
+            'attempt' => $attempt,
+            'canTakeExam' => $canTakeExam,
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true
@@ -279,53 +326,67 @@ class AdminExamsController extends Controller
     {
         $this->checkAdmin();
 
-        // 1. Initial Validation
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'class_id' => 'required|exists:school_classes,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'instructions' => 'nullable|string',
-            'description' => 'nullable|string',
-            'type' => ['required', Rule::in('quiz', 'midterm', 'end_of_term', 'practice', 'mock')],
-            'duration' => 'required|integer|min:1',
-            'total_marks' => 'required|integer|min:1',
-            'passing_marks' => 'required|integer|min:0',
-            'start_time' => 'required|date',
-            'end_time' => ['required', 'date', 'after:start_time'],
-            'max_attempts' => 'required|integer|min:1',
+        // Use transaction to ensure data consistency
+        return DB::transaction(function () use ($request, $exam) {
+            try {
+                // 1. Initial Validation
+                $validated = $request->validate([
+                    'title' => 'required|string|max:255',
+                    'class_id' => 'required|exists:school_classes,id',
+                    'subject_id' => 'required|exists:subjects,id',
+                    'instructions' => 'nullable|string',
+                    'description' => 'nullable|string',
+                    'type' => ['required', Rule::in('quiz', 'midterm', 'end_of_term', 'practice', 'mock')],
+                    'duration' => 'required|integer|min:1',
+                    'total_marks' => 'required|integer|min:1',
+                    'passing_marks' => 'required|integer|min:0',
+                    'start_time' => 'required|date',
+                    'end_time' => ['required', 'date', 'after:start_time'],
+                    'max_attempts' => 'required|integer|min:1',
 
-            'is_draft' => 'required|in:0,1',
+                    'is_draft' => 'required|in:0,1',
 
-            'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
-        ]);
+                    'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
+                ]);
 
-        // 2. Process Checkbox and Draft Status
-        $data = array_merge($validated, [
-            'randomize_questions' => $request->has('randomize_questions'),
-            'require_fullscreen' => $request->has('require_fullscreen'),
-            'show_results' => $request->has('show_results'),
-            'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
-        ]);
+                // 2. Process Checkbox and Draft Status
+                $data = array_merge($validated, [
+                    'randomize_questions' => $request->has('randomize_questions'),
+                    'require_fullscreen' => $request->has('require_fullscreen'),
+                    'show_results' => $request->has('show_results'),
+                    'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
+                ]);
 
-        // 3. Update Exam
-        $exam->update(Arr::except($data, ['questions', 'is_draft']));
+                // 3. Update Exam
+                $exam->update(Arr::except($data, ['questions', 'is_draft']));
 
-        // 4. Clean up old questions and re-save new ones
-        $questionIds = $exam->questions()->pluck('question_id');
-        $exam->questions()->detach(); // Remove pivot records
+                // 4. Clean up old questions and re-save new ones
+                $questionIds = $exam->questions()->pluck('question_id');
+                $exam->questions()->detach(); // Remove pivot records
 
-        // Delete related options and the question records themselves
-        QuestionOption::whereIn('question_id', $questionIds)->delete();
-        Question::whereIn('id', $questionIds)->delete();
+                // Delete related options and the question records themselves
+                QuestionOption::whereIn('question_id', $questionIds)->delete();
+                Question::whereIn('id', $questionIds)->delete();
 
-        if (isset($validated['questions'])) {
-            $this->validateAndSaveQuestions($exam, $validated['questions']);
-        }
+                if (isset($validated['questions']) && !empty($validated['questions'])) {
+                    $this->validateAndSaveQuestions($exam, $validated['questions']);
+                }
 
-        $message = $exam->is_published ? 'Exam updated and published successfully!' : 'Exam updated and saved as draft successfully!';
+                $message = $exam->is_published ? 'Exam updated and published successfully!' : 'Exam updated and saved as draft successfully!';
 
-        return redirect()->route('admin.exams.index')
-            ->with('success', $message);
+                return redirect()->route('admin.exams.index')
+                    ->with('success', $message);
+
+            } catch (ValidationException $e) {
+                Log::error('Exam update validation failed:', ['errors' => $e->errors()]);
+                throw $e;
+            } catch (\Exception $e) {
+                Log::error('Exam update failed:', ['error' => $e->getMessage()]);
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Failed to update exam. Please try again.');
+            }
+        });
     }
 
     /**
@@ -335,17 +396,27 @@ class AdminExamsController extends Controller
     {
         $this->checkAdmin();
 
-        // Get IDs before deleting the exam (which may cascade the pivot table)
-        $questionIds = $exam->questions()->pluck('question_id');
+        // Use transaction to ensure data consistency
+        return DB::transaction(function () use ($exam) {
+            try {
+                // Get IDs before deleting the exam
+                $questionIds = $exam->questions()->pluck('question_id');
 
-        $exam->delete();
+                $exam->delete();
 
-        // Delete the related options and the question records themselves (reusable pool)
-        QuestionOption::whereIn('question_id', $questionIds)->delete();
-        Question::whereIn('id', $questionIds)->delete();
+                // Delete the related options and the question records themselves
+                QuestionOption::whereIn('question_id', $questionIds)->delete();
+                Question::whereIn('id', $questionIds)->delete();
 
-        return redirect()->route('admin.exams.index')
-            ->with('success', 'Exam deleted successfully!');
+                return redirect()->route('admin.exams.index')
+                    ->with('success', 'Exam deleted successfully!');
+
+            } catch (\Exception $e) {
+                Log::error('Exam deletion failed:', ['error' => $e->getMessage()]);
+                return redirect()->route('admin.exams.index')
+                    ->with('error', 'Failed to delete exam. Please try again.');
+            }
+        });
     }
 
     /**
