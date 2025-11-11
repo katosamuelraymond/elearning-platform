@@ -450,4 +450,10 @@ public function taughtSubjects()
         )->distinct();
     }
 
+    public function class()
+    {
+        return $this->belongsTo(\App\Models\Academic\SchoolClass::class, 'class_id');
+    }
+
+
 }

@@ -67,28 +67,85 @@ class TeacherExamsController extends Controller
     /**
      * Display teacher's exams
      */
-    public function index()
+    public function index(Request $request)
     {
-        $exams = Exam::where('teacher_id', auth()->id())
+        $query = Exam::where('teacher_id', auth()->id())
             ->with(['class', 'subject'])
             ->withCount(['attempts', 'attempts as submitted_count' => function($query) {
                 $query->where('status', 'submitted');
-            }])
-            ->latest()
-            ->paginate(10);
+            }]);
+
+        // Search functionality
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'LIKE', "%{$search}%")
+                    ->orWhere('description', 'LIKE', "%{$search}%")
+                    ->orWhereHas('class', function($q) use ($search) {
+                        $q->where('name', 'LIKE', "%{$search}%");
+                    })
+                    ->orWhereHas('subject', function($q) use ($search) {
+                        $q->where('name', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        // Filter by status
+        if ($request->has('status') && $request->status != '') {
+            if ($request->status === 'published') {
+                $query->where('is_published', true);
+            } elseif ($request->status === 'draft') {
+                $query->where('is_published', false);
+            } elseif ($request->status === 'archived') {
+                $query->where('is_archived', true);
+            }
+        }
+
+        // Filter by class
+        if ($request->has('class_id') && $request->class_id != '') {
+            $query->where('class_id', $request->class_id);
+        }
+
+        // Filter by subject
+        if ($request->has('subject_id') && $request->subject_id != '') {
+            $query->where('subject_id', $request->subject_id);
+        }
+
+        $exams = $query->latest()->paginate(10);
 
         $stats = [
             'total' => Exam::where('teacher_id', auth()->id())->count(),
             'published' => Exam::where('teacher_id', auth()->id())->where('is_published', true)->count(),
             'draft' => Exam::where('teacher_id', auth()->id())->where('is_published', false)->count(),
+            'archived' => Exam::where('teacher_id', auth()->id())->where('is_archived', true)->count(),
             'attempts' => ExamAttempt::whereHas('exam', function($query) {
                 $query->where('teacher_id', auth()->id());
             })->count(),
         ];
 
+        // Get teacher's assigned classes and subjects
+        $assignedClasses = TeacherAssignment::where('teacher_id', auth()->id())
+            ->where('is_active', true)
+            ->with('class')
+            ->get()
+            ->pluck('class')
+            ->unique('id')
+            ->filter();
+
+        $assignedSubjects = TeacherAssignment::where('teacher_id', auth()->id())
+            ->where('is_active', true)
+            ->with('subject')
+            ->get()
+            ->pluck('subject')
+            ->unique('id')
+            ->filter();
+
         return $this->renderView('modules.exams.index', [
             'exams' => $exams,
             'stats' => $stats,
+            'classes' => $assignedClasses,
+            'subjects' => $assignedSubjects,
+            'filters' => $request->only(['search', 'status', 'class_id', 'subject_id']),
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true
@@ -289,45 +346,6 @@ class TeacherExamsController extends Controller
     }
 
     /**
-     * Attach questions to exam (both bank and new questions)
-     */
-    private function attachQuestionsToExam(Exam $exam, array $bankQuestionIds, array $newQuestionsData)
-    {
-        $questionOrder = 0;
-        $totalPoints = 0;
-
-        // 1. Attach bank questions
-        foreach ($bankQuestionIds as $questionId) {
-            $question = Question::find($questionId);
-            if ($question) {
-                $points = request()->input("bank_question_points.{$questionId}", $question->points);
-
-                $exam->questions()->attach($question->id, [
-                    'order' => $questionOrder++,
-                    'points' => $points
-                ]);
-
-                $totalPoints += $points;
-                Log::info('Bank question attached to exam:', [
-                    'exam_id' => $exam->id,
-                    'question_id' => $question->id,
-                    'points' => $points
-                ]);
-            }
-        }
-
-        // 2. Create and attach new questions
-        if (!empty($newQuestionsData)) {
-            $validatedNewQuestions = $this->validateAndSaveNewQuestions($exam, $newQuestionsData);
-
-            foreach ($validatedNewQuestions as $qData) {
-                $totalPoints += $qData['points'];
-                $questionOrder++;
-            }
-        }
-    }
-
-    /**
      * Validate and save new questions
      */
     private function validateAndSaveNewQuestions(Exam $exam, array $questionsData)
@@ -508,8 +526,8 @@ class TeacherExamsController extends Controller
      */
     public function update(Request $request, Exam $exam)
     {
-        // Verify teacher owns this exam
-        if ($exam->teacher_id !== auth()->id()) {
+        // Verify ownership for teacher
+        if (auth()->user()->isTeacher() && $exam->teacher_id !== auth()->id()) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -536,29 +554,35 @@ class TeacherExamsController extends Controller
                     // Bank questions (comma-separated IDs)
                     'selected_bank_questions' => 'nullable|string',
 
-                    // New questions
-                    'questions' => 'nullable|array',
+                    // Custom questions
+                    'custom_questions' => 'nullable|array',
                 ]);
 
-                // 2. Validate teacher assignment
-                if (!$this->validateTeacherAssignment($validated['class_id'], $validated['subject_id'])) {
-                    throw ValidationException::withMessages([
-                        'class_id' => 'You are not assigned to teach this subject for the selected class.',
-                        'subject_id' => 'You are not assigned to teach this subject for the selected class.'
-                    ]);
-                }
-
-                // 3. Validate that we have at least one question if not draft
+                // 2. Validate that we have at least one question if not draft
                 $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
-                $newQuestions = $validated['questions'] ?? [];
+                $customQuestions = $validated['custom_questions'] ?? [];
 
-                if ($validated['is_draft'] == '0' && empty($bankQuestions) && empty($newQuestions)) {
+                // DEBUG: Log what we're receiving
+                Log::info('🔍 DEBUG: Update method - Questions validation', [
+                    'selected_bank_questions_input' => $validated['selected_bank_questions'] ?? 'empty',
+                    'parsed_bank_questions' => $bankQuestions,
+                    'bank_questions_count' => count($bankQuestions),
+                    'custom_questions_count' => count($customQuestions),
+                    'is_draft' => $validated['is_draft'],
+                    'bank_question_points' => $request->input('bank_question_points', [])
+                ]);
+
+                if ($validated['is_draft'] == '0' && empty($bankQuestions) && empty($customQuestions)) {
+                    Log::error('Exam update validation failed: No questions found', [
+                        'bank_questions' => $bankQuestions,
+                        'custom_questions' => $customQuestions
+                    ]);
                     throw ValidationException::withMessages([
                         'questions' => 'At least one question is required for published exams.'
                     ]);
                 }
 
-                // 4. Process Checkbox and Draft Status
+                // 3. Process Checkbox and Draft Status
                 $data = array_merge($validated, [
                     'randomize_questions' => $request->has('randomize_questions'),
                     'require_fullscreen' => $request->has('require_fullscreen'),
@@ -566,26 +590,26 @@ class TeacherExamsController extends Controller
                     'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
                 ]);
 
-                // 5. Update Exam
-                $exam->update(Arr::except($data, ['questions', 'selected_bank_questions', 'is_draft']));
+                // 4. Update Exam
+                $exam->update(Arr::except($data, ['custom_questions', 'selected_bank_questions', 'is_draft']));
 
-                // 6. Clean up old questions and re-attach
+                // 5. Clean up old questions and re-attach
                 $questionIds = $exam->questions()->pluck('question_id');
-                $exam->questions()->detach();
+                $exam->questions()->detach(); // Remove pivot records
 
-                // Delete only new questions (not bank questions)
+                // Delete only custom questions (not bank questions)
                 Question::whereIn('id', $questionIds)
                     ->where('is_bank_question', false)
                     ->delete();
 
                 QuestionOption::whereIn('question_id', $questionIds)->delete();
 
-                // 7. Re-attach questions
-                $this->attachQuestionsToExam($exam, $bankQuestions, $newQuestions);
+                // 6. Re-attach questions
+                $this->attachQuestionsToExam($exam, $bankQuestions, $customQuestions, $request);
 
                 $message = $exam->is_published ? 'Exam updated and published successfully!' : 'Exam updated and saved as draft successfully!';
 
-                return redirect()->route('teacher.exams.index')
+                return redirect()->route(auth()->user()->isAdmin() ? 'admin.exams.index' : 'teacher.exams.index')
                     ->with('success', $message);
 
             } catch (ValidationException $e) {
@@ -600,6 +624,187 @@ class TeacherExamsController extends Controller
         });
     }
 
+    /**
+     * Attach questions to exam (both bank and custom questions)
+     */
+    private function attachQuestionsToExam(Exam $exam, array $bankQuestionIds, array $customQuestionsData, Request $request)
+    {
+        $questionOrder = 0;
+        $totalPoints = 0;
+
+        Log::info('🔍 DEBUG: attachQuestionsToExam - Starting', [
+            'bank_question_ids' => $bankQuestionIds,
+            'custom_questions_count' => count($customQuestionsData),
+            'bank_question_points_from_request' => $request->input('bank_question_points', [])
+        ]);
+
+        // 1. Attach bank questions
+        foreach ($bankQuestionIds as $questionId) {
+            $question = Question::find($questionId);
+            if ($question) {
+                // Use points from request or fall back to question's default points
+                $points = $request->input("bank_question_points.{$questionId}", $question->points);
+
+                $exam->questions()->attach($question->id, [
+                    'order' => $questionOrder++,
+                    'points' => $points
+                ]);
+
+                $totalPoints += $points;
+                Log::info('🔍 DEBUG: Bank question attached to exam', [
+                    'exam_id' => $exam->id,
+                    'question_id' => $question->id,
+                    'points' => $points,
+                    'question_order' => $questionOrder - 1
+                ]);
+            } else {
+                Log::warning('🔍 DEBUG: Bank question not found', ['question_id' => $questionId]);
+            }
+        }
+
+        // 2. Create and attach custom questions
+        if (!empty($customQuestionsData)) {
+            $validatedCustomQuestions = $this->validateAndSaveCustomQuestions($exam, $customQuestionsData);
+
+            foreach ($validatedCustomQuestions as $qData) {
+                $totalPoints += $qData['points'];
+                $questionOrder++;
+            }
+        }
+
+        Log::info('🔍 DEBUG: attachQuestionsToExam - Completed', [
+            'total_questions_attached' => $questionOrder,
+            'total_points' => $totalPoints
+        ]);
+    }
+
+    /**
+     * Validate and save custom questions
+     */
+    private function validateAndSaveCustomQuestions(Exam $exam, array $questionsData)
+    {
+        Log::info('Custom questions data received:', ['questions' => $questionsData]);
+
+        // Define validation rules for each question item
+        $rules = [];
+
+        foreach ($questionsData as $index => $question) {
+            $questionType = $question['type'] ?? null;
+
+            // Base rules for all questions
+            $rules["{$index}.type"] = ['required', Rule::in(['mcq', 'true_false', 'short_answer', 'essay', 'fill_blank'])];
+            $rules["{$index}.points"] = ['required', 'numeric', 'min:0.5', 'max:100'];
+            $rules["{$index}.question_text"] = ['required', 'string'];
+
+            // Type-specific rules
+            switch ($questionType) {
+                case 'mcq':
+                    $rules["{$index}.correct_answer"] = ['required', 'integer', 'min:0'];
+                    $rules["{$index}.options"] = ['required', 'array', 'min:2', 'max:6'];
+                    $rules["{$index}.options.*"] = ['required', 'string', 'max:500'];
+                    break;
+
+                case 'true_false':
+                    $rules["{$index}.correct_answer"] = ['required', Rule::in(['true', 'false'])];
+                    break;
+
+                case 'short_answer':
+                    $rules["{$index}.expected_answer"] = ['nullable', 'string'];
+                    break;
+
+                case 'essay':
+                    $rules["{$index}.grading_rubric"] = ['nullable', 'string'];
+                    break;
+
+                case 'fill_blank':
+                    $rules["{$index}.blank_question"] = ['required', 'string'];
+                    $rules["{$index}.blank_answers"] = ['required', 'string'];
+                    break;
+            }
+        }
+
+        // Validate the questions array
+        $validator = Validator::make($questionsData, $rules);
+
+        if ($validator->fails()) {
+            Log::error('Custom question validation failed:', ['errors' => $validator->errors()->toArray()]);
+            throw new ValidationException($validator);
+        }
+
+        $validatedQuestions = $validator->validated();
+        $savedQuestions = [];
+
+        // Save questions
+        foreach ($validatedQuestions as $index => $qData) {
+            $details = [];
+            $correctAnswer = null;
+
+            // Prepare question data based on type
+            switch ($qData['type']) {
+                case 'mcq':
+                    $correctAnswer = $qData['correct_answer'];
+                    break;
+                case 'true_false':
+                    $correctAnswer = $qData['correct_answer'];
+                    break;
+                case 'short_answer':
+                    $details['expected_answer'] = $qData['expected_answer'] ?? null;
+                    $correctAnswer = $details['expected_answer'];
+                    break;
+                case 'essay':
+                    $details['grading_rubric'] = $qData['grading_rubric'] ?? null;
+                    break;
+                case 'fill_blank':
+                    $details['blank_question'] = $qData['blank_question'];
+                    $blankAnswers = array_map('trim', explode(',', $qData['blank_answers'] ?? ''));
+                    $details['blank_answers'] = $blankAnswers;
+                    $correctAnswer = json_encode($blankAnswers);
+                    break;
+            }
+
+            // Create the base Question record
+            $questionData = [
+                'subject_id' => $exam->subject_id,
+                'created_by' => Auth::id(),
+                'type' => $qData['type'],
+                'points' => $qData['points'],
+                'question_text' => $qData['question_text'],
+                'details' => !empty($details) ? $details : null,
+                'correct_answer' => $correctAnswer,
+                'is_active' => true,
+                'is_bank_question' => false, // Custom questions are not added to bank by default
+            ];
+
+            $question = Question::create($questionData);
+
+            // Attach to exam
+            $exam->questions()->attach($question->id, [
+                'order' => $exam->questions()->count(),
+                'points' => $qData['points']
+            ]);
+
+            // Handle Multiple Choice Options
+            if ($qData['type'] === 'mcq' && !empty($qData['options'])) {
+                foreach ($qData['options'] as $optIndex => $optionText) {
+                    QuestionOption::create([
+                        'question_id' => $question->id,
+                        'option_text' => $optionText,
+                        'is_correct' => ($optIndex == $qData['correct_answer']),
+                        'order' => $optIndex,
+                    ]);
+                }
+            }
+
+            $savedQuestions[] = $qData;
+        }
+
+        Log::info('All custom questions saved successfully for exam:', [
+            'exam_id' => $exam->id,
+            'questions_count' => count($validatedQuestions)
+        ]);
+
+        return $savedQuestions;
+    }
     /**
      * Remove the specified resource from storage.
      */
@@ -636,25 +841,6 @@ class TeacherExamsController extends Controller
         });
     }
 
-    /**
-     * Toggle publish status of exam.
-     */
-    public function togglePublish(Exam $exam)
-    {
-        // Verify teacher owns this exam
-        if ($exam->teacher_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $exam->update([
-            'is_published' => !$exam->is_published
-        ]);
-
-        $status = $exam->is_published ? 'published' : 'unpublished';
-
-        return redirect()->route('teacher.exams.index')
-            ->with('success', "Exam {$status} successfully!");
-    }
 
     /**
      * Display exam attempts
@@ -707,5 +893,97 @@ class TeacherExamsController extends Controller
             'showSidebar' => true,
             'showFooter' => true
         ]);
+    }
+
+    /**
+     * Display exam for printing
+     */
+    public function print(Exam $exam)
+    {
+        // Verify teacher owns this exam (for teacher controller)
+        if (auth()->user()->isTeacher() && $exam->teacher_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $exam->load(['class', 'subject', 'questions' => function($query) {
+            $query->orderBy('pivot_order');
+        }, 'questions.options']);
+
+        $includeAnswers = request()->has('answers');
+        $studentVersion = request()->has('student');
+
+        return view('modules.exams.print', [
+            'exam' => $exam,
+            'includeAnswers' => $includeAnswers,
+            'studentVersion' => $studentVersion,
+            'showNavbar' => false,
+            'showSidebar' => false,
+            'showFooter' => false
+        ]);
+    }
+
+    /**
+     * Generate PDF version of exam
+     */
+    public function printPDF(Exam $exam)
+    {
+        // Verify teacher owns this exam (for teacher controller)
+        if (auth()->user()->isTeacher() && $exam->teacher_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $exam->load(['class', 'subject', 'questions' => function($query) {
+            $query->orderBy('pivot_order');
+        }, 'questions.options']);
+
+        $includeAnswers = request()->has('answers');
+        $studentVersion = request()->has('student');
+
+        // For now, we'll redirect to print view. Later you can integrate DomPDF or similar
+        return redirect()->route(auth()->user()->isAdmin() ? 'admin.exams.print' : 'teacher.exams.print', [
+            'exam' => $exam,
+            'answers' => $includeAnswers ? '1' : '0',
+            'student' => $studentVersion ? '1' : '0'
+        ]);
+    }
+
+    /**
+     * Toggle publish status of exam.
+     */
+    public function togglePublish(Exam $exam)
+    {
+        // Verify teacher owns this exam
+        if ($exam->teacher_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $exam->update([
+            'is_published' => !$exam->is_published
+        ]);
+
+        $status = $exam->is_published ? 'published' : 'unpublished';
+
+        return redirect()->route('teacher.exams.index')
+            ->with('success', "Exam {$status} successfully!");
+    }
+
+    /**
+     * Toggle archive status of exam.
+     */
+    public function toggleArchive(Exam $exam)
+    {
+        // Verify teacher owns this exam
+        if ($exam->teacher_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $exam->update([
+            'is_archived' => !$exam->is_archived
+        ]);
+
+        $status = $exam->is_archived ? 'archived' : 'unarchived';
+
+        return redirect()->route('teacher.exams.index')
+            ->with('success', "Exam {$status} successfully!");
     }
 }

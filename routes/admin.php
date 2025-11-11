@@ -69,16 +69,19 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('/{exam}', [AdminExamsController::class, 'update']);
         Route::delete('/{exam}', [AdminExamsController::class, 'destroy'])->name('destroy');
 
+        Route::get('admin/exams/{exam}/print', [AdminExamsController::class, 'print'])->name('print');
+        Route::get('admin/exams/{exam}/print-pdf', [AdminExamsController::class, 'printPDF'])->name('print-pdf');
+
+
         // Exam Actions
         Route::patch('/{exam}/toggle-publish', [AdminExamsController::class, 'togglePublish'])->name('toggle-publish');
+        Route::patch('admin/exams/{exam}/toggle-archive', [AdminExamsController::class, 'toggleArchive'])->name('toggle-archive');
 
         // Exam Attempts Management
         Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
 
-        // Question Bank Route - MAKE SURE THIS LINE EXISTS
-
-    });
+           });
 
     Route::prefix('questions')->name('questions.')->group(function () {
         Route::get('/', [AdminQuestionsController::class, 'index'])->name('index');

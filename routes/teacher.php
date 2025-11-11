@@ -51,6 +51,11 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
         Route::delete('/{exam}', [TeacherExamsController::class, 'destroy'])->name('destroy');
         Route::get('/{exam}/attempts', [TeacherExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [TeacherExamsController::class, 'showAttempt'])->name('attempts.show');
+        Route::get('exams/{exam}/print', [TeacherExamsController::class, 'print'])->name('print');
+        Route::get('exams/{exam}/print-pdf', [TeacherExamsController::class, 'printPDF'])->name('print-pdf');
+        Route::patch('exams/{exam}/toggle-publish', [TeacherExamsController::class, 'togglePublish'])->name('toggle-publish');
+        Route::patch('exams/{exam}/toggle-archive', [TeacherExamsController::class, 'toggleArchive'])->name('toggle-archive');
+
     });
 
     // routes/teacher.php

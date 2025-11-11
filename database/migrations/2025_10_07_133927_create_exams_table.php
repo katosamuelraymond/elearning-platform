@@ -30,6 +30,7 @@ return new class extends Migration
             $table->boolean('require_fullscreen')->default(false);
             $table->boolean('show_results')->default(true);
             $table->boolean('is_published')->default(false);
+            $table->boolean('is_archived')->default(false); // Added this line
             $table->timestamps();
         });
     }

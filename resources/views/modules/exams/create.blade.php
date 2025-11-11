@@ -18,6 +18,8 @@
                 <input type="hidden" name="selected_bank_questions" id="selected_bank_questions" value="">
                 <!-- Dynamic route for question bank -->
                 <input type="hidden" id="question-bank-route" value="{{ auth()->user()->isAdmin() ? route('admin.exams.question-bank') : route('teacher.exams.question-bank') }}">
+                <!-- Container for bank question points data -->
+                <div id="bank-questions-data-container"></div>
 
                 <!-- Exam Details Card -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
@@ -647,6 +649,7 @@
             const newQuestionsContainer = document.getElementById('new-questions-container');
             const previewQuestionsContainer = document.getElementById('preview-questions-container');
             const selectedBankQuestionsInput = document.getElementById('selected_bank_questions');
+            const bankQuestionsDataContainer = document.getElementById('bank-questions-data-container');
             const selectedCountSpan = document.getElementById('selected-count');
             const previewCountSpan = document.getElementById('preview-count');
             const totalPointsSpan = document.getElementById('total-points');
@@ -654,306 +657,8 @@
             const previewSummary = document.getElementById('preview-summary');
             const validationAlertsContainer = document.getElementById('validation-alerts-container');
 
-            // Initialize
-            initializeEventListeners();
-            updateSelectedQuestionsDisplay();
-            updatePreview();
-
-            function initializeEventListeners() {
-                // Tab switching
-                document.getElementById('selected-questions-tab').addEventListener('click', () => switchTab('selected'));
-                document.getElementById('new-questions-tab').addEventListener('click', () => switchTab('new'));
-                document.getElementById('preview-questions-tab').addEventListener('click', () => switchTab('preview'));
-
-                // Question Bank Modal
-                document.getElementById('open-question-bank-btn').addEventListener('click', openQuestionBank);
-                document.getElementById('open-question-bank-bottom').addEventListener('click', openQuestionBank);
-                document.getElementById('close-question-bank').addEventListener('click', closeQuestionBank);
-                document.getElementById('cancel-bank-selection').addEventListener('click', closeQuestionBank);
-
-                // Question Bank Actions
-                document.getElementById('add-selected-questions').addEventListener('click', addSelectedBankQuestions);
-                document.getElementById('select-all-questions').addEventListener('change', toggleSelectAllBankQuestions);
-                document.getElementById('load-bank-questions').addEventListener('click', loadBankQuestions);
-
-                // New Questions
-                document.getElementById('add-question-btn').addEventListener('click', addNewQuestion);
-                document.getElementById('add-another-question').addEventListener('click', addNewQuestion);
-
-                // Exam details changes
-                document.getElementById('total_marks').addEventListener('input', updatePreview);
-
-                // Event delegation for dynamic elements
-                selectedQuestionsContainer.addEventListener('click', handleSelectedQuestionsClick);
-                selectedQuestionsContainer.addEventListener('input', handleSelectedQuestionsInput);
-                newQuestionsContainer.addEventListener('click', handleNewQuestionsClick);
-                newQuestionsContainer.addEventListener('input', handleNewQuestionsInput);
-                newQuestionsContainer.addEventListener('change', handleNewQuestionsChange);
-                document.getElementById('question-bank-content').addEventListener('change', handleBankQuestionCheckboxChange);
-
-                // Point calculation
-                selectedQuestionsContainer.addEventListener('input', debounce(updateTotalPoints, 300));
-                newQuestionsContainer.addEventListener('input', debounce(updateTotalPoints, 300));
-            }
-
-            function switchTab(tabName) {
-                state.currentTab = tabName;
-
-                // Update tabs
-                document.querySelectorAll('.question-tab').forEach(tab => {
-                    tab.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                    tab.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                });
-
-                document.getElementById(`${tabName}-questions-tab`).classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                document.getElementById(`${tabName}-questions-tab`).classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-
-                // Update panels
-                document.querySelectorAll('.question-panel').forEach(panel => panel.classList.add('hidden'));
-                document.getElementById(`${tabName}-questions-panel`).classList.remove('hidden');
-
-                // Update preview when switching to preview tab
-                if (tabName === 'preview') {
-                    updatePreview();
-                }
-            }
-
-            function openQuestionBank() {
-                questionBankModal.classList.remove('hidden');
-                loadBankQuestions();
-            }
-
-            function closeQuestionBank() {
-                console.log('🔍 Closing question bank modal');
-                questionBankModal.classList.add('hidden');
-                // Clear selections
-                document.querySelectorAll('.bank-question-checkbox').forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-                updateSelectedBankCount();
-            }
-
-            async function loadBankQuestions() {
-                const content = document.getElementById('question-bank-content');
-                content.innerHTML = `
-        <div class="text-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Loading questions...</p>
-        </div>
-    `;
-
-                try {
-                    const questionBankRoute = document.getElementById('question-bank-route')?.value;
-                    if (!questionBankRoute) throw new Error('Question bank route not found.');
-
-                    const filters = {
-                        subject_id: document.getElementById('bank-subject-filter')?.value || '',
-                        type: document.getElementById('bank-type-filter')?.value || '',
-                        difficulty: document.getElementById('bank-difficulty-filter')?.value || '',
-                        search: document.getElementById('bank-search')?.value || ''
-                    };
-
-                    const fullUrl = questionBankRoute + '?' + new URLSearchParams(filters);
-
-                    const response = await fetch(fullUrl, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        renderBankQuestions(data.questions);
-                        window.bankQuestions = data.questions;
-                    } else {
-                        throw new Error(data.message || 'Failed to load questions');
-                    }
-
-                } catch (error) {
-                    content.innerHTML = `
-            <div class="text-center py-8 text-red-600 dark:text-red-400">
-                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                <p>Failed to load questions. Please try again.</p>
-                <p class="text-sm mt-2">Error: ${error.message}</p>
-                <div class="mt-3">
-                    <button type="button" onclick="loadBankQuestions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
-                        <i class="fas fa-refresh mr-2"></i>Retry
-                    </button>
-                </div>
-            </div>
-        `;
-                }
-            }
-
-            function renderBankQuestions(questions) {
-                const content = document.getElementById('question-bank-content');
-                const template = document.getElementById('bank-question-template');
-
-                if (questions.length === 0) {
-                    content.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
-                <p class="text-gray-500 dark:text-gray-400">No questions found</p>
-                <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters</p>
-            </div>
-        `;
-                    return;
-                }
-
-                content.innerHTML = '';
-
-                questions.forEach((question) => {
-                    const questionElement = template.content.cloneNode(true);
-                    const item = questionElement.querySelector('.bank-question-item');
-
-                    // Set question data
-                    const checkbox = item.querySelector('.bank-question-checkbox');
-                    checkbox.value = question.id;
-
-                    // Update question details
-                    item.querySelector('.type-badge').textContent = getQuestionTypeLabel(question.type);
-                    item.querySelector('.difficulty-badge').textContent = question.difficulty;
-                    item.querySelector('.subject-name').textContent = question.subject?.name || 'Unknown Subject';
-                    item.querySelector('.question-text').textContent = question.question_text;
-                    item.querySelector('.question-points').textContent = question.points;
-                    item.querySelector('.question-id').textContent = question.id;
-
-                    // Add preview for MCQ questions
-                    if (question.type === 'mcq' && question.options) {
-                        const preview = item.querySelector('.question-preview');
-                        preview.classList.remove('hidden');
-                        question.options.forEach(option => {
-                            const optionDiv = document.createElement('div');
-                            optionDiv.className = 'flex items-center';
-                            optionDiv.innerHTML = `
-                    <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
-                    <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
-                        ${option.option_text}
-                    </span>
-                `;
-                            preview.appendChild(optionDiv);
-                        });
-                    }
-
-                    content.appendChild(questionElement);
-                });
-
-                document.getElementById('bank-results-count').textContent = `Found ${questions.length} questions`;
-            }
-
-            function handleBankQuestionCheckboxChange(e) {
-                if (e.target.classList.contains('bank-question-checkbox')) {
-                    updateSelectedBankCount();
-                }
-            }
-
-            function updateSelectedBankCount() {
-                const selected = document.querySelectorAll('.bank-question-checkbox:checked');
-                const count = selected.length;
-                document.getElementById('selected-bank-count').textContent = count;
-            }
-
-            function toggleSelectAllBankQuestions(e) {
-                const checkboxes = document.querySelectorAll('.bank-question-checkbox');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = e.target.checked;
-                });
-                updateSelectedBankCount();
-            }
-
-            function addSelectedBankQuestions() {
-                const selectedCheckboxes = document.querySelectorAll('.bank-question-checkbox:checked');
-
-                selectedCheckboxes.forEach(checkbox => {
-                    const questionId = checkbox.value;
-                    if (!state.selectedQuestions.has(questionId)) {
-                        const questionItem = checkbox.closest('.bank-question-item');
-                        const questionData = {
-                            id: questionId,
-                            type: questionItem.querySelector('.type-badge').textContent.toLowerCase().replace(' ', '_'),
-                            difficulty: questionItem.querySelector('.difficulty-badge').textContent,
-                            subject: questionItem.querySelector('.subject-name').textContent,
-                            question_text: questionItem.querySelector('.question-text').textContent,
-                            points: questionItem.querySelector('.question-points').textContent,
-                            options: []
-                        };
-
-                        state.selectedQuestions.set(questionId, questionData);
-                    }
-                });
-
-                updateSelectedQuestionsDisplay();
-                closeQuestionBank();
-            }
-
-            function updateSelectedQuestionsDisplay() {
-                const container = document.getElementById('selected-questions-container');
-                const noQuestions = document.getElementById('no-questions-selected');
-                const template = document.getElementById('selected-question-template');
-
-                // Clear container
-                container.innerHTML = '';
-                container.appendChild(noQuestions);
-
-                if (state.selectedQuestions.size === 0) {
-                    noQuestions.classList.remove('hidden');
-                    selectedCountSpan.textContent = '0';
-                    updateTotalPoints();
-                    updatePreview();
-                    return;
-                }
-
-                noQuestions.classList.add('hidden');
-
-                state.selectedQuestions.forEach((question, questionId) => {
-                    const questionElement = template.content.cloneNode(true);
-                    const item = questionElement.querySelector('.selected-question-item');
-
-                    item.setAttribute('data-question-id', questionId);
-                    item.querySelector('.question-type-badge').textContent = getQuestionTypeLabel(question.type);
-                    item.querySelector('.difficulty-badge').textContent = question.difficulty;
-                    item.querySelector('.question-subject').textContent = question.subject;
-                    item.querySelector('.question-text').textContent = question.question_text;
-                    item.querySelector('.selected-question-points').value = question.points;
-                    item.querySelector('.question-id span').textContent = questionId;
-
-                    container.appendChild(questionElement);
-                });
-
-                selectedCountSpan.textContent = state.selectedQuestions.size;
-                updateTotalPoints();
-                updateSelectedBankQuestionsInput();
-                updatePreview();
-            }
-
-            function handleSelectedQuestionsClick(e) {
-                if (e.target.closest('.remove-selected-question')) {
-                    const questionItem = e.target.closest('.selected-question-item');
-                    const questionId = questionItem.getAttribute('data-question-id');
-                    state.selectedQuestions.delete(questionId);
-                    updateSelectedQuestionsDisplay();
-                }
-            }
-
-            function handleSelectedQuestionsInput(e) {
-                if (e.target.classList.contains('selected-question-points')) {
-                    const questionItem = e.target.closest('.selected-question-item');
-                    const questionId = questionItem.getAttribute('data-question-id');
-                    if (state.selectedQuestions.has(questionId)) {
-                        state.selectedQuestions.get(questionId).points = e.target.value;
-                    }
-                    updateTotalPoints();
-                    updatePreview();
-                }
-            }
-
-            function updateTotalPoints() {
+            // Core Functions - Defined First
+            function calculateTotalPoints() {
                 let total = 0;
 
                 // Calculate from selected bank questions
@@ -968,214 +673,12 @@
                     total += parseInt(pointsInput.value) || 0;
                 });
 
+                return total;
+            }
+
+            function updateTotalPoints() {
+                const total = calculateTotalPoints();
                 totalPointsSpan.textContent = total;
-            }
-
-            function updateSelectedBankQuestionsInput() {
-                const selectedIds = Array.from(state.selectedQuestions.keys());
-                selectedBankQuestionsInput.value = selectedIds.join(',');
-            }
-
-            // New Question functionality
-            function addNewQuestion() {
-                const template = document.getElementById('new-question-template');
-                const newQuestion = template.content.cloneNode(true);
-                const questionElement = newQuestion.querySelector('.question-item');
-
-                state.newQuestionsCount++;
-                const questionIndex = state.newQuestionsCount - 1;
-
-                // Update all input names with the new index
-                const inputs = questionElement.querySelectorAll('[name]');
-                inputs.forEach(input => {
-                    const oldName = input.getAttribute('name');
-                    const newName = oldName.replace(/questions\[\d+\]/, `questions[${questionIndex}]`);
-                    input.setAttribute('name', newName);
-                });
-
-                questionElement.querySelector('.question-number').textContent = state.newQuestionsCount;
-                newQuestionsContainer.appendChild(questionElement);
-
-                // Initialize question data with complete structure
-                state.newQuestionsData.set(questionIndex, {
-                    type: 'mcq',
-                    points: 5,
-                    question_text: '',
-                    options: [],
-                    correct_answer: '0',
-                    expected_answer: '',
-                    grading_rubric: '',
-                    blank_question: '',
-                    blank_answers: '',
-                    isNew: true
-                });
-
-                // Switch to new questions tab
-                switchTab('new');
-                updateTotalPoints();
-                updatePreview();
-            }
-
-            function handleNewQuestionsClick(e) {
-                // Remove question
-                if (e.target.closest('.remove-question')) {
-                    if (confirm('Are you sure you want to remove this question?')) {
-                        const questionItem = e.target.closest('.question-item');
-                        const questionIndex = getQuestionIndex(questionItem);
-                        state.newQuestionsData.delete(questionIndex);
-                        questionItem.remove();
-                        state.newQuestionsCount--;
-                        updateTotalPoints();
-                        updatePreview();
-                    }
-                }
-
-                // Add option
-                if (e.target.closest('.add-option')) {
-                    addOption(e.target.closest('.add-option'));
-                }
-
-                // Remove option
-                if (e.target.closest('.remove-option')) {
-                    const removeBtn = e.target.closest('.remove-option');
-                    if (!removeBtn.disabled) {
-                        removeOption(removeBtn);
-                    }
-                }
-
-                // Question type change
-                if (e.target.classList.contains('question-type')) {
-                    handleQuestionTypeChange(e.target);
-                }
-            }
-
-            function handleNewQuestionsInput(e) {
-                const questionItem = e.target.closest('.question-item');
-                const questionIndex = getQuestionIndex(questionItem);
-                const questionData = state.newQuestionsData.get(questionIndex);
-
-                if (!questionData) return;
-
-                if (e.target.classList.contains('question-points')) {
-                    questionData.points = e.target.value;
-                    updateTotalPoints();
-                } else if (e.target.classList.contains('question-type')) {
-                    questionData.type = e.target.value;
-                } else if (e.target.name && e.target.name.includes('question_text')) {
-                    questionData.question_text = e.target.value;
-                } else if (e.target.name && e.target.name.includes('expected_answer')) {
-                    questionData.expected_answer = e.target.value;
-                } else if (e.target.name && e.target.name.includes('grading_rubric')) {
-                    questionData.grading_rubric = e.target.value;
-                } else if (e.target.name && e.target.name.includes('blank_question')) {
-                    questionData.blank_question = e.target.value;
-                } else if (e.target.name && e.target.name.includes('blank_answers')) {
-                    questionData.blank_answers = e.target.value;
-                } else if (e.target.name && e.target.name.includes('options')) {
-                    // Update MCQ options
-                    const optionIndex = parseInt(e.target.name.match(/options\]\[(\d+)\]/)[1]);
-                    if (!questionData.options[optionIndex]) {
-                        questionData.options[optionIndex] = { text: '', is_correct: false };
-                    }
-                    questionData.options[optionIndex].text = e.target.value;
-                }
-
-                updatePreview();
-            }
-
-            function handleNewQuestionsChange(e) {
-                const questionItem = e.target.closest('.question-item');
-                const questionIndex = getQuestionIndex(questionItem);
-                const questionData = state.newQuestionsData.get(questionIndex);
-
-                if (!questionData) return;
-
-                if (e.target.name && e.target.name.includes('correct_answer')) {
-                    questionData.correct_answer = e.target.value;
-                    updatePreview();
-                }
-            }
-
-            function handleQuestionTypeChange(selectElement) {
-                const questionItem = selectElement.closest('.question-item');
-                const selectedType = selectElement.value;
-
-                const optionsContainers = questionItem.querySelectorAll('.options-container');
-                optionsContainers.forEach(container => {
-                    container.classList.add('hidden');
-                });
-
-                const targetContainer = questionItem.querySelector(`.options-container[data-type="${selectedType}"]`);
-                if (targetContainer) {
-                    targetContainer.classList.remove('hidden');
-                }
-
-                // Update stored data
-                const questionIndex = getQuestionIndex(questionItem);
-                if (state.newQuestionsData.has(questionIndex)) {
-                    state.newQuestionsData.get(questionIndex).type = selectedType;
-                }
-
-                updatePreview();
-            }
-
-            function addOption(button) {
-                const questionItem = button.closest('.question-item');
-                const optionGroup = questionItem.querySelector('.option-group');
-                const options = optionGroup.querySelectorAll('.option-item');
-                const optionCount = options.length;
-                const questionIndex = getQuestionIndex(questionItem);
-
-                if (optionCount >= 6) {
-                    alert('Maximum 6 options allowed per question.');
-                    return;
-                }
-
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'flex items-center option-item';
-                optionDiv.innerHTML = `
-                <input type="radio" name="questions[${questionIndex}][correct_answer]" value="${optionCount}" class="mr-3 text-blue-600">
-                <input type="text" name="questions[${questionIndex}][options][${optionCount}]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option ${String.fromCharCode(65 + optionCount)}" required>
-                <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-
-                optionGroup.appendChild(optionDiv);
-                updateOptionButtons(questionItem);
-
-                // Initialize option data
-                const questionData = state.newQuestionsData.get(questionIndex);
-                if (questionData && !questionData.options[optionCount]) {
-                    questionData.options[optionCount] = { text: '', is_correct: false };
-                }
-            }
-
-            function removeOption(button) {
-                const questionItem = button.closest('.question-item');
-                const optionGroup = questionItem.querySelector('.option-group');
-                const options = optionGroup.querySelectorAll('.option-item');
-
-                if (options.length <= 2) {
-                    alert('Multiple choice questions must have at least 2 options.');
-                    return;
-                }
-
-                button.closest('.option-item').remove();
-                updateOptionButtons(questionItem);
-            }
-
-            function updateOptionButtons(questionItem) {
-                const optionGroup = questionItem.querySelector('.option-group');
-                const options = optionGroup.querySelectorAll('.option-item');
-                const removeButtons = optionGroup.querySelectorAll('.remove-option');
-
-                removeButtons.forEach((button, index) => {
-                    const isDisabled = options.length <= 2;
-                    button.disabled = isDisabled;
-                    button.classList.toggle('disabled:opacity-50', isDisabled);
-                    button.classList.toggle('disabled:cursor-not-allowed', isDisabled);
-                });
             }
 
             function getQuestionIndex(questionItem) {
@@ -1194,7 +697,19 @@
                 return labels[type] || type;
             }
 
-            // Validation functionality
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            // Validation Functions
             function validateExam() {
                 const validationResults = {
                     warnings: [],
@@ -1349,27 +864,27 @@
                 const title = type === 'error' ? 'Error' : 'Warning';
 
                 alert.innerHTML = `
-                    <div class="flex items-start">
-                        <i class="fas ${icon} mt-0.5 mr-3 ${
+                <div class="flex items-start">
+                    <i class="fas ${icon} mt-0.5 mr-3 ${
                     type === 'error'
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-yellow-600 dark:text-yellow-400'
                 }"></i>
-                        <div class="flex-1">
-                            <h4 class="text-sm font-medium ${
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium ${
                     type === 'error'
                         ? 'text-red-800 dark:text-red-300'
                         : 'text-yellow-800 dark:text-yellow-300'
                 }">${title}</h4>
-                            <p class="text-sm ${
+                        <p class="text-sm ${
                     type === 'error'
                         ? 'text-red-700 dark:text-red-400'
                         : 'text-yellow-700 dark:text-yellow-400'
                 } mt-1">${validation.message}</p>
-                            ${validation.details ? renderValidationDetails(validation.details, type) : ''}
-                        </div>
+                        ${validation.details ? renderValidationDetails(validation.details, type) : ''}
                     </div>
-                `;
+                </div>
+            `;
 
                 return alert;
             }
@@ -1380,9 +895,9 @@
                 const textColor = type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400';
 
                 return `
-                    <div class="mt-2 text-xs ${textColor}">
-                        <ul class="list-disc list-inside space-y-1">
-                            ${details.map(detail => {
+                <div class="mt-2 text-xs ${textColor}">
+                    <ul class="list-disc list-inside space-y-1">
+                        ${details.map(detail => {
                     if (detail.source === 'bank') {
                         return `<li>Bank Question ID ${detail.id}: ${detail.preview || detail.issue}</li>`;
                     } else if (detail.source === 'new') {
@@ -1392,9 +907,9 @@
                     }
                     return `<li>${detail.preview || detail.issue}</li>`;
                 }).join('')}
-                        </ul>
-                    </div>
-                `;
+                    </ul>
+                </div>
+            `;
             }
 
             // Preview functionality
@@ -1428,7 +943,6 @@
                     const questionElement = createPreviewQuestion(question, questionNumber, 'bank', questionId);
                     container.appendChild(questionElement);
                     questionNumber++;
-                    totalPoints += parseInt(question.points) || 0;
                     questionTypes.add(question.type);
                 });
 
@@ -1437,7 +951,6 @@
                     const questionElement = createPreviewQuestion(question, questionNumber, 'new', questionIndex);
                     container.appendChild(questionElement);
                     questionNumber++;
-                    totalPoints += parseInt(question.points) || 0;
                     questionTypes.add(question.type);
                 });
 
@@ -1501,9 +1014,9 @@
                                 const answerOption = document.createElement('div');
                                 answerOption.className = 'flex items-center mb-2';
                                 answerOption.innerHTML = `
-                                    <input type="radio" name="student_answer_${source}_${id}" value="${index}" class="mr-3 text-blue-600">
-                                    <span>${String.fromCharCode(65 + index)}. ${option.text}</span>
-                                `;
+                                <input type="radio" name="student_answer_${source}_${id}" value="${index}" class="mr-3 text-blue-600">
+                                <span>${String.fromCharCode(65 + index)}. ${option.text}</span>
+                            `;
                                 answerInput.appendChild(answerOption);
                             }
                         });
@@ -1512,45 +1025,622 @@
                     }
                 } else if (question.type === 'true_false') {
                     answerInput.innerHTML = `
-                        <div class="space-y-2">
-                            <label class="flex items-center">
-                                <input type="radio" name="student_answer_${source}_${id}" value="true" class="mr-3 text-blue-600">
-                                <span>True</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="student_answer_${source}_${id}" value="false" class="mr-3 text-blue-600">
-                                <span>False</span>
-                            </label>
-                        </div>
-                    `;
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="student_answer_${source}_${id}" value="true" class="mr-3 text-blue-600">
+                            <span>True</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="student_answer_${source}_${id}" value="false" class="mr-3 text-blue-600">
+                            <span>False</span>
+                        </label>
+                    </div>
+                `;
                 } else if (question.type === 'short_answer') {
                     answerInput.innerHTML = `
-                        <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="Type your short answer here..."></textarea>
-                    `;
+                    <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="Type your short answer here..."></textarea>
+                `;
                 } else if (question.type === 'essay') {
                     answerInput.innerHTML = `
-                        <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="4" placeholder="Write your essay answer here..."></textarea>
-                    `;
+                    <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="4" placeholder="Write your essay answer here..."></textarea>
+                `;
                 } else if (question.type === 'fill_blank') {
                     answerInput.innerHTML = `
-                        <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" placeholder="Enter your answer...">
-                    `;
+                    <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" placeholder="Enter your answer...">
+                `;
                 }
 
                 return questionElement;
             }
 
-            function debounce(func, wait) {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
+            // Question Bank Functions
+            function openQuestionBank() {
+                questionBankModal.classList.remove('hidden');
+                loadBankQuestions();
             }
+
+            function closeQuestionBank() {
+                questionBankModal.classList.add('hidden');
+                // Clear selections
+                document.querySelectorAll('.bank-question-checkbox').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                updateSelectedBankCount();
+            }
+
+            async function loadBankQuestions() {
+                const content = document.getElementById('question-bank-content');
+                content.innerHTML = `
+        <div class="text-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Loading questions...</p>
+        </div>
+    `;
+
+                try {
+                    const questionBankRoute = document.getElementById('question-bank-route')?.value;
+                    if (!questionBankRoute) throw new Error('Question bank route not found.');
+
+                    const filters = {
+                        subject_id: document.getElementById('bank-subject-filter')?.value || '',
+                        type: document.getElementById('bank-type-filter')?.value || '',
+                        difficulty: document.getElementById('bank-difficulty-filter')?.value || '',
+                        search: document.getElementById('bank-search')?.value || ''
+                    };
+
+                    const fullUrl = questionBankRoute + '?' + new URLSearchParams(filters);
+
+                    const response = await fetch(fullUrl, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        renderBankQuestions(data.questions);
+                        window.bankQuestions = data.questions;
+                    } else {
+                        throw new Error(data.message || 'Failed to load questions');
+                    }
+
+                } catch (error) {
+                    content.innerHTML = `
+            <div class="text-center py-8 text-red-600 dark:text-red-400">
+                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                <p>Failed to load questions. Please try again.</p>
+                <p class="text-sm mt-2">Error: ${error.message}</p>
+                <div class="mt-3">
+                    <button type="button" onclick="loadBankQuestions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                        <i class="fas fa-refresh mr-2"></i>Retry
+                    </button>
+                </div>
+            </div>
+        `;
+                }
+            }
+
+            function renderBankQuestions(questions) {
+                const content = document.getElementById('question-bank-content');
+                const template = document.getElementById('bank-question-template');
+
+                if (questions.length === 0) {
+                    content.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                <p class="text-gray-500 dark:text-gray-400">No questions found</p>
+                <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters</p>
+            </div>
+        `;
+                    return;
+                }
+
+                content.innerHTML = '';
+
+                questions.forEach((question) => {
+                    const questionElement = template.content.cloneNode(true);
+                    const item = questionElement.querySelector('.bank-question-item');
+
+                    // Set question data
+                    const checkbox = item.querySelector('.bank-question-checkbox');
+                    checkbox.value = question.id;
+
+                    // Update question details
+                    item.querySelector('.type-badge').textContent = getQuestionTypeLabel(question.type);
+                    item.querySelector('.difficulty-badge').textContent = question.difficulty;
+                    item.querySelector('.subject-name').textContent = question.subject?.name || 'Unknown Subject';
+                    item.querySelector('.question-text').textContent = question.question_text;
+                    item.querySelector('.question-points').textContent = question.points;
+                    item.querySelector('.question-id').textContent = question.id;
+
+                    // Add preview for MCQ questions
+                    if (question.type === 'mcq' && question.options) {
+                        const preview = item.querySelector('.question-preview');
+                        preview.classList.remove('hidden');
+                        question.options.forEach(option => {
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'flex items-center';
+                            optionDiv.innerHTML = `
+                    <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
+                    <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
+                        ${option.option_text}
+                    </span>
+                `;
+                            preview.appendChild(optionDiv);
+                        });
+
+                        // Store the complete question data including options for later retrieval
+                        item.setAttribute('data-question-data', JSON.stringify(question));
+                    }
+
+                    content.appendChild(questionElement);
+                });
+
+                document.getElementById('bank-results-count').textContent = `Found ${questions.length} questions`;
+            }
+
+
+            function handleBankQuestionCheckboxChange(e) {
+                if (e.target.classList.contains('bank-question-checkbox')) {
+                    updateSelectedBankCount();
+                }
+            }
+
+            function updateSelectedBankCount() {
+                const selected = document.querySelectorAll('.bank-question-checkbox:checked');
+                const count = selected.length;
+                document.getElementById('selected-bank-count').textContent = count;
+            }
+
+            function toggleSelectAllBankQuestions(e) {
+                const checkboxes = document.querySelectorAll('.bank-question-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = e.target.checked;
+                });
+                updateSelectedBankCount();
+            }
+
+            function addSelectedBankQuestions() {
+                const selectedCheckboxes = document.querySelectorAll('.bank-question-checkbox:checked');
+
+                selectedCheckboxes.forEach(checkbox => {
+                    const questionId = checkbox.value;
+                    if (!state.selectedQuestions.has(questionId)) {
+                        const questionItem = checkbox.closest('.bank-question-item');
+
+                        // Try to get complete question data from data attribute first
+                        const questionDataAttr = questionItem.getAttribute('data-question-data');
+
+                        if (questionDataAttr) {
+                            // Use the complete question data from the AJAX response
+                            const questionData = JSON.parse(questionDataAttr);
+
+                            // Ensure options are properly formatted for our system
+                            if (questionData.options) {
+                                questionData.options = questionData.options.map(option => ({
+                                    text: option.option_text,
+                                    is_correct: option.is_correct
+                                }));
+                            }
+
+                            state.selectedQuestions.set(questionId, questionData);
+                        } else {
+                            // Fallback: extract from preview (original method)
+                            const options = [];
+                            const previewContainer = questionItem.querySelector('.question-preview');
+
+                            if (previewContainer && !previewContainer.classList.contains('hidden')) {
+                                const optionElements = previewContainer.querySelectorAll('.flex.items-center');
+                                optionElements.forEach((optionElement, index) => {
+                                    const optionText = optionElement.querySelector('span:last-child').textContent;
+                                    const isCorrect = optionElement.querySelector('.bg-green-500') !== null;
+                                    options.push({
+                                        text: optionText,
+                                        is_correct: isCorrect
+                                    });
+                                });
+                            }
+
+                            const questionData = {
+                                id: questionId,
+                                type: questionItem.querySelector('.type-badge').textContent.toLowerCase().replace(' ', '_'),
+                                difficulty: questionItem.querySelector('.difficulty-badge').textContent,
+                                subject: questionItem.querySelector('.subject-name').textContent,
+                                question_text: questionItem.querySelector('.question-text').textContent,
+                                points: questionItem.querySelector('.question-points').textContent,
+                                options: options
+                            };
+
+                            state.selectedQuestions.set(questionId, questionData);
+                        }
+                    }
+                });
+
+                updateSelectedQuestionsDisplay();
+                closeQuestionBank();
+            }
+
+            function updateSelectedQuestionsDisplay() {
+                const container = document.getElementById('selected-questions-container');
+                const noQuestions = document.getElementById('no-questions-selected');
+                const template = document.getElementById('selected-question-template');
+
+                // Clear container
+                container.innerHTML = '';
+                container.appendChild(noQuestions);
+
+                if (state.selectedQuestions.size === 0) {
+                    noQuestions.classList.remove('hidden');
+                    selectedCountSpan.textContent = '0';
+                    updateTotalPoints();
+                    updatePreview();
+                    updateSelectedBankQuestionsInput();
+                    return;
+                }
+
+                noQuestions.classList.add('hidden');
+
+                state.selectedQuestions.forEach((question, questionId) => {
+                    const questionElement = template.content.cloneNode(true);
+                    const item = questionElement.querySelector('.selected-question-item');
+
+                    item.setAttribute('data-question-id', questionId);
+                    item.querySelector('.question-type-badge').textContent = getQuestionTypeLabel(question.type);
+                    item.querySelector('.difficulty-badge').textContent = question.difficulty;
+                    item.querySelector('.question-subject').textContent = question.subject;
+                    item.querySelector('.question-text').textContent = question.question_text;
+                    item.querySelector('.selected-question-points').value = question.points;
+                    item.querySelector('.question-id span').textContent = questionId;
+
+                    // Add options preview for MCQ questions in selected questions panel
+                    if (question.type === 'mcq' && question.options && question.options.length > 0) {
+                        const optionsContainer = item.querySelector('.question-options');
+                        optionsContainer.classList.remove('hidden');
+
+                        question.options.forEach((option, index) => {
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'flex items-center';
+                            optionDiv.innerHTML = `
+                    <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
+                    <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
+                        ${option.text || option.option_text}
+                    </span>
+                `;
+                            optionsContainer.appendChild(optionDiv);
+                        });
+                    }
+
+                    container.appendChild(questionElement);
+                });
+
+                selectedCountSpan.textContent = state.selectedQuestions.size;
+                updateTotalPoints();
+                updateSelectedBankQuestionsInput();
+                updatePreview();
+            }
+
+            function updateSelectedBankQuestionsInput() {
+                const selectedIds = Array.from(state.selectedQuestions.keys());
+                selectedBankQuestionsInput.value = selectedIds.join(',');
+
+                // Also update the points data container
+                const container = document.getElementById('bank-questions-data-container');
+                container.innerHTML = '';
+
+                state.selectedQuestions.forEach((question, questionId) => {
+                    const pointsInput = document.createElement('input');
+                    pointsInput.type = 'hidden';
+                    pointsInput.name = `bank_question_points[${questionId}]`;
+
+                    // Get the current points value from the visible input
+                    const questionElement = document.querySelector(`.selected-question-item[data-question-id="${questionId}"]`);
+                    if (questionElement) {
+                        const pointsField = questionElement.querySelector('.selected-question-points');
+                        pointsInput.value = pointsField ? pointsField.value : question.points;
+                    } else {
+                        pointsInput.value = question.points;
+                    }
+
+                    container.appendChild(pointsInput);
+                });
+            }
+
+            // New Question Functions
+            function addNewQuestion() {
+                const template = document.getElementById('new-question-template');
+                const newQuestion = template.content.cloneNode(true);
+                const questionElement = newQuestion.querySelector('.question-item');
+
+                state.newQuestionsCount++;
+                const questionIndex = state.newQuestionsCount - 1;
+
+                // Update all input names with the new index
+                const inputs = questionElement.querySelectorAll('[name]');
+                inputs.forEach(input => {
+                    const oldName = input.getAttribute('name');
+                    const newName = oldName.replace(/questions\[\d+\]/, `questions[${questionIndex}]`);
+                    input.setAttribute('name', newName);
+                });
+
+                questionElement.querySelector('.question-number').textContent = state.newQuestionsCount;
+                newQuestionsContainer.appendChild(questionElement);
+
+                // Initialize question data with complete structure
+                state.newQuestionsData.set(questionIndex, {
+                    type: 'mcq',
+                    points: 5,
+                    question_text: '',
+                    options: [],
+                    correct_answer: '0',
+                    expected_answer: '',
+                    grading_rubric: '',
+                    blank_question: '',
+                    blank_answers: '',
+                    isNew: true
+                });
+
+                // Switch to new questions tab
+                switchTab('new');
+                updateTotalPoints();
+                updatePreview();
+            }
+
+            function handleQuestionTypeChange(selectElement) {
+                const questionItem = selectElement.closest('.question-item');
+                const selectedType = selectElement.value;
+
+                const optionsContainers = questionItem.querySelectorAll('.options-container');
+                optionsContainers.forEach(container => {
+                    container.classList.add('hidden');
+                });
+
+                const targetContainer = questionItem.querySelector(`.options-container[data-type="${selectedType}"]`);
+                if (targetContainer) {
+                    targetContainer.classList.remove('hidden');
+                }
+
+                // Update stored data
+                const questionIndex = getQuestionIndex(questionItem);
+                if (state.newQuestionsData.has(questionIndex)) {
+                    state.newQuestionsData.get(questionIndex).type = selectedType;
+                }
+
+                updatePreview();
+            }
+
+            function addOption(button) {
+                const questionItem = button.closest('.question-item');
+                const optionGroup = questionItem.querySelector('.option-group');
+                const options = optionGroup.querySelectorAll('.option-item');
+                const optionCount = options.length;
+                const questionIndex = getQuestionIndex(questionItem);
+
+                if (optionCount >= 6) {
+                    alert('Maximum 6 options allowed per question.');
+                    return;
+                }
+
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'flex items-center option-item';
+                optionDiv.innerHTML = `
+                <input type="radio" name="questions[${questionIndex}][correct_answer]" value="${optionCount}" class="mr-3 text-blue-600">
+                <input type="text" name="questions[${questionIndex}][options][${optionCount}]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option ${String.fromCharCode(65 + optionCount)}" required>
+                <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+
+                optionGroup.appendChild(optionDiv);
+                updateOptionButtons(questionItem);
+
+                // Initialize option data
+                const questionData = state.newQuestionsData.get(questionIndex);
+                if (questionData && !questionData.options[optionCount]) {
+                    questionData.options[optionCount] = { text: '', is_correct: false };
+                }
+            }
+
+            function removeOption(button) {
+                const questionItem = button.closest('.question-item');
+                const optionGroup = questionItem.querySelector('.option-group');
+                const options = optionGroup.querySelectorAll('.option-item');
+
+                if (options.length <= 2) {
+                    alert('Multiple choice questions must have at least 2 options.');
+                    return;
+                }
+
+                button.closest('.option-item').remove();
+                updateOptionButtons(questionItem);
+            }
+
+            function updateOptionButtons(questionItem) {
+                const optionGroup = questionItem.querySelector('.option-group');
+                const options = optionGroup.querySelectorAll('.option-item');
+                const removeButtons = optionGroup.querySelectorAll('.remove-option');
+
+                removeButtons.forEach((button, index) => {
+                    const isDisabled = options.length <= 2;
+                    button.disabled = isDisabled;
+                    button.classList.toggle('disabled:opacity-50', isDisabled);
+                    button.classList.toggle('disabled:cursor-not-allowed', isDisabled);
+                });
+            }
+
+            // Event Handlers
+            function handleSelectedQuestionsClick(e) {
+                if (e.target.closest('.remove-selected-question')) {
+                    const questionItem = e.target.closest('.selected-question-item');
+                    const questionId = questionItem.getAttribute('data-question-id');
+                    state.selectedQuestions.delete(questionId);
+                    updateSelectedQuestionsDisplay();
+                }
+            }
+
+            function handleSelectedQuestionsInput(e) {
+                if (e.target.classList.contains('selected-question-points')) {
+                    const questionItem = e.target.closest('.selected-question-item');
+                    const questionId = questionItem.getAttribute('data-question-id');
+                    if (state.selectedQuestions.has(questionId)) {
+                        state.selectedQuestions.get(questionId).points = e.target.value;
+                    }
+                    updateTotalPoints();
+                    updatePreview();
+                    // Update the hidden inputs when points change
+                    updateSelectedBankQuestionsInput();
+                }
+            }
+
+            function handleNewQuestionsClick(e) {
+                // Remove question
+                if (e.target.closest('.remove-question')) {
+                    if (confirm('Are you sure you want to remove this question?')) {
+                        const questionItem = e.target.closest('.question-item');
+                        const questionIndex = getQuestionIndex(questionItem);
+                        state.newQuestionsData.delete(questionIndex);
+                        questionItem.remove();
+                        state.newQuestionsCount--;
+                        updateTotalPoints();
+                        updatePreview();
+                    }
+                }
+
+                // Add option
+                if (e.target.closest('.add-option')) {
+                    addOption(e.target.closest('.add-option'));
+                }
+
+                // Remove option
+                if (e.target.closest('.remove-option')) {
+                    const removeBtn = e.target.closest('.remove-option');
+                    if (!removeBtn.disabled) {
+                        removeOption(removeBtn);
+                    }
+                }
+
+                // Question type change
+                if (e.target.classList.contains('question-type')) {
+                    handleQuestionTypeChange(e.target);
+                }
+            }
+
+            function handleNewQuestionsInput(e) {
+                const questionItem = e.target.closest('.question-item');
+                const questionIndex = getQuestionIndex(questionItem);
+                const questionData = state.newQuestionsData.get(questionIndex);
+
+                if (!questionData) return;
+
+                if (e.target.classList.contains('question-points')) {
+                    questionData.points = e.target.value;
+                    updateTotalPoints();
+                } else if (e.target.classList.contains('question-type')) {
+                    questionData.type = e.target.value;
+                } else if (e.target.name && e.target.name.includes('question_text')) {
+                    questionData.question_text = e.target.value;
+                } else if (e.target.name && e.target.name.includes('expected_answer')) {
+                    questionData.expected_answer = e.target.value;
+                } else if (e.target.name && e.target.name.includes('grading_rubric')) {
+                    questionData.grading_rubric = e.target.value;
+                } else if (e.target.name && e.target.name.includes('blank_question')) {
+                    questionData.blank_question = e.target.value;
+                } else if (e.target.name && e.target.name.includes('blank_answers')) {
+                    questionData.blank_answers = e.target.value;
+                } else if (e.target.name && e.target.name.includes('options')) {
+                    // Update MCQ options
+                    const optionIndex = parseInt(e.target.name.match(/options\]\[(\d+)\]/)[1]);
+                    if (!questionData.options[optionIndex]) {
+                        questionData.options[optionIndex] = { text: '', is_correct: false };
+                    }
+                    questionData.options[optionIndex].text = e.target.value;
+                }
+
+                updatePreview();
+            }
+
+            function handleNewQuestionsChange(e) {
+                const questionItem = e.target.closest('.question-item');
+                const questionIndex = getQuestionIndex(questionItem);
+                const questionData = state.newQuestionsData.get(questionIndex);
+
+                if (!questionData) return;
+
+                if (e.target.name && e.target.name.includes('correct_answer')) {
+                    questionData.correct_answer = e.target.value;
+                    updatePreview();
+                }
+            }
+
+            // Main initialization
+            function initializeEventListeners() {
+                // Tab switching
+                document.getElementById('selected-questions-tab').addEventListener('click', () => switchTab('selected'));
+                document.getElementById('new-questions-tab').addEventListener('click', () => switchTab('new'));
+                document.getElementById('preview-questions-tab').addEventListener('click', () => switchTab('preview'));
+
+                // Question Bank Modal
+                document.getElementById('open-question-bank-btn').addEventListener('click', openQuestionBank);
+                document.getElementById('open-question-bank-bottom').addEventListener('click', openQuestionBank);
+                document.getElementById('close-question-bank').addEventListener('click', closeQuestionBank);
+                document.getElementById('cancel-bank-selection').addEventListener('click', closeQuestionBank);
+
+                // Question Bank Actions
+                document.getElementById('add-selected-questions').addEventListener('click', addSelectedBankQuestions);
+                document.getElementById('select-all-questions').addEventListener('change', toggleSelectAllBankQuestions);
+                document.getElementById('load-bank-questions').addEventListener('click', loadBankQuestions);
+
+                // New Questions
+                document.getElementById('add-question-btn').addEventListener('click', addNewQuestion);
+                document.getElementById('add-another-question').addEventListener('click', addNewQuestion);
+
+                // Exam details changes
+                document.getElementById('total_marks').addEventListener('input', updatePreview);
+
+                // Event delegation for dynamic elements
+                selectedQuestionsContainer.addEventListener('click', handleSelectedQuestionsClick);
+                selectedQuestionsContainer.addEventListener('input', handleSelectedQuestionsInput);
+                newQuestionsContainer.addEventListener('click', handleNewQuestionsClick);
+                newQuestionsContainer.addEventListener('input', handleNewQuestionsInput);
+                newQuestionsContainer.addEventListener('change', handleNewQuestionsChange);
+                document.getElementById('question-bank-content').addEventListener('change', handleBankQuestionCheckboxChange);
+
+                // Point calculation
+                selectedQuestionsContainer.addEventListener('input', debounce(updateTotalPoints, 300));
+                newQuestionsContainer.addEventListener('input', debounce(updateTotalPoints, 300));
+            }
+
+            function switchTab(tabName) {
+                state.currentTab = tabName;
+
+                // Update tabs
+                document.querySelectorAll('.question-tab').forEach(tab => {
+                    tab.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                    tab.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                });
+
+                document.getElementById(`${tabName}-questions-tab`).classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                document.getElementById(`${tabName}-questions-tab`).classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+
+                // Update panels
+                document.querySelectorAll('.question-panel').forEach(panel => panel.classList.add('hidden'));
+                document.getElementById(`${tabName}-questions-panel`).classList.remove('hidden');
+
+                // Update preview when switching to preview tab
+                if (tabName === 'preview') {
+                    updatePreview();
+                }
+            }
+
+            // Initialize the application
+            initializeEventListeners();
+            updateSelectedQuestionsDisplay();
+            updatePreview();
 
             // Make loadBankQuestions available globally for retry button
             window.loadBankQuestions = loadBankQuestions;

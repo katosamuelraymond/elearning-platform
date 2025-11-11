@@ -8,7 +8,6 @@
             <!-- Header -->
             <div class="flex justify-between items-center mb-8">
                 <div>
-
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ $exam->title }}</h1>
                     <p class="text-gray-600 dark:text-gray-300 mt-2">
                         {{ $exam->subject->name }} • {{ $exam->class->name }}
@@ -155,77 +154,190 @@
                         @endif
                     </div>
 
-                    <!-- Questions Section -->
+                    <!-- Questions Section - Enhanced -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                            <i class="fas fa-question-circle mr-3 text-green-500"></i>
-                            Exam Questions ({{ $exam->questions->count() }})
-                        </h2>
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                                <i class="fas fa-question-circle mr-3 text-green-500"></i>
+                                Exam Questions ({{ $exam->questions->count() }})
+                            </h2>
+                            <div class="flex space-x-2">
+                                <span class="px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    {{ $exam->questions->where('is_bank_question', true)->count() }} Bank Questions
+                                </span>
+                                <span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    {{ $exam->questions->where('is_bank_question', false)->count() }} Custom Questions
+                                </span>
+                            </div>
+                        </div>
 
-                        <div class="space-y-4">
-                            @foreach($exam->questions as $index => $question)
-                                <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                    <div class="flex justify-between items-start mb-3">
-                                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                                            Question {{ $index + 1 }}
-                                            <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
-                                                ({{ $question->pivot->points }} points)
-                                            </span>
-                                        </h3>
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 capitalize">
-                                            {{ str_replace('_', ' ', $question->type) }}
-                                        </span>
-                                    </div>
-
-                                    <div class="mb-4">
-                                        <p class="text-gray-700 dark:text-gray-300">{{ $question->question_text }}</p>
-                                    </div>
-
-                                    @if($question->type === 'mcq')
-                                        <div class="space-y-2">
-                                            @foreach($question->options as $optionIndex => $option)
-                                                <div class="flex items-center space-x-3 p-2 rounded {{ $option->is_correct ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-700' }}">
-                                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400 w-6">
-                                                        {{ chr(65 + $optionIndex) }}.
+                        @if($exam->questions->count() > 0)
+                            <div class="space-y-6">
+                                @foreach($exam->questions->sortBy('pivot.order') as $index => $question)
+                                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-6 hover:shadow-md transition-shadow duration-200">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div class="flex items-center space-x-3">
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                                                    Question {{ $index + 1 }}
+                                                </h3>
+                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 capitalize">
+                                                    {{ str_replace('_', ' ', $question->type) }}
+                                                </span>
+                                                @if($question->is_bank_question)
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center">
+                                                        <i class="fas fa-database mr-1"></i>
+                                                        Bank Question
                                                     </span>
-                                                    <span class="text-gray-700 dark:text-gray-300 {{ $option->is_correct ? 'font-semibold text-green-700 dark:text-green-300' : '' }}">
-                                                        {{ $option->option_text }}
+                                                @else
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 flex items-center">
+                                                        <i class="fas fa-pen mr-1"></i>
+                                                        Custom Question
                                                     </span>
-                                                    @if($option->is_correct)
-                                                        <span class="ml-auto text-green-600 dark:text-green-400 text-sm">
-                                                            <i class="fas fa-check"></i> Correct
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            @endforeach
+                                                @endif
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                                                    {{ $question->pivot->points }} points
+                                                </span>
+                                                @if($question->difficulty)
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">
+                                                        Difficulty: {{ $question->difficulty }}
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </div>
-                                    @elseif($question->type === 'true_false')
-                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                                            <p class="text-gray-700 dark:text-gray-300">
-                                                Correct Answer: <span class="font-semibold">{{ ucfirst($question->correct_answer) }}</span>
+
+                                        <!-- Question Text -->
+                                        <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                            <p class="text-gray-800 dark:text-gray-200 text-lg leading-relaxed">
+                                                {{ $question->question_text }}
                                             </p>
                                         </div>
-                                    @elseif($question->type === 'short_answer' && $question->details['expected_answer'])
-                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Expected Answer:</p>
-                                            <p class="text-gray-700 dark:text-gray-300">{{ $question->details['expected_answer'] }}</p>
+
+                                        <!-- Question Content Based on Type -->
+                                        @if($question->type === 'mcq')
+                                            <div class="space-y-3">
+                                                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Options:</h4>
+                                                @foreach($question->options->sortBy('order') as $optionIndex => $option)
+                                                    <div class="flex items-center space-x-3 p-3 rounded-lg border {{ $option->is_correct ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700' }}">
+                                                        <span class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full {{ $option->is_correct ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }} font-medium text-sm">
+                                                            {{ chr(65 + $optionIndex) }}
+                                                        </span>
+                                                        <span class="flex-1 text-gray-700 dark:text-gray-300 {{ $option->is_correct ? 'font-semibold' : '' }}">
+                                                            {{ $option->option_text }}
+                                                        </span>
+                                                        @if($option->is_correct)
+                                                            <span class="flex-shrink-0 text-green-600 dark:text-green-400 text-sm font-medium flex items-center">
+                                                                <i class="fas fa-check-circle mr-1"></i>
+                                                                Correct Answer
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+
+                                        @elseif($question->type === 'true_false')
+                                            <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Correct Answer:</h4>
+                                                <div class="flex items-center space-x-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-4 h-4 rounded-full border-2 {{ $question->correct_answer === 'true' ? 'border-green-500 bg-green-500' : 'border-gray-300' }} mr-2"></div>
+                                                        <span class="text-gray-700 dark:text-gray-300 {{ $question->correct_answer === 'true' ? 'font-semibold text-green-600 dark:text-green-400' : '' }}">True</span>
+                                                    </div>
+                                                    <div class="flex items-center">
+                                                        <div class="w-4 h-4 rounded-full border-2 {{ $question->correct_answer === 'false' ? 'border-green-500 bg-green-500' : 'border-gray-300' }} mr-2"></div>
+                                                        <span class="text-gray-700 dark:text-gray-300 {{ $question->correct_answer === 'false' ? 'font-semibold text-green-600 dark:text-green-400' : '' }}">False</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        @elseif($question->type === 'short_answer')
+                                            <div class="space-y-4">
+                                                @if(isset($question->details['expected_answer']) && $question->details['expected_answer'])
+                                                    <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Expected Answer (for grading):</h4>
+                                                        <p class="text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded border">
+                                                            {{ $question->details['expected_answer'] }}
+                                                        </p>
+                                                    </div>
+                                                @endif
+                                                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer Area:</h4>
+                                                    <div class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded p-3 min-h-[100px] text-gray-500 dark:text-gray-400">
+                                                        Student will type their answer here...
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        @elseif($question->type === 'essay')
+                                            <div class="space-y-4">
+                                                @if(isset($question->details['grading_rubric']) && $question->details['grading_rubric'])
+                                                    <div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Grading Rubric:</h4>
+                                                        <p class="text-gray-700 dark:text-gray-300 whitespace-pre-line bg-white dark:bg-gray-800 p-3 rounded border">
+                                                            {{ $question->details['grading_rubric'] }}
+                                                        </p>
+                                                    </div>
+                                                @endif
+                                                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer Area:</h4>
+                                                    <div class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded p-3 min-h-[200px] text-gray-500 dark:text-gray-400">
+                                                        Student will write their essay here...
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        @elseif($question->type === 'fill_blank')
+                                            <div class="space-y-4">
+                                                @if(isset($question->details['blank_question']) && $question->details['blank_question'])
+                                                    <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question with Blanks:</h4>
+                                                        <p class="text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded border">
+                                                            {!! str_replace('[blank]', '<span class="bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded border border-yellow-300 dark:border-yellow-600 font-medium">______</span>', e($question->details['blank_question'])) !!}
+                                                        </p>
+                                                    </div>
+                                                @endif
+                                                @if(isset($question->details['blank_answers']) && $question->details['blank_answers'])
+                                                    <div class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Correct Answers:</h4>
+                                                        <div class="flex flex-wrap gap-2">
+                                                            @foreach((array)$question->details['blank_answers'] as $answer)
+                                                                <span class="bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
+                                                                    {{ $answer }}
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        <!-- Question Metadata -->
+                                        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+                                            <div class="flex space-x-4">
+                                                <span>ID: {{ $question->id }}</span>
+                                                @if($question->subject)
+                                                    <span>Subject: {{ $question->subject->name }}</span>
+                                                @endif
+                                            </div>
+                                            <div>
+                                                Created: {{ $question->created_at->format('M j, Y') }}
+                                            </div>
                                         </div>
-                                    @elseif($question->type === 'essay' && $question->details['grading_rubric'])
-                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Grading Rubric:</p>
-                                            <p class="text-gray-700 dark:text-gray-300">{{ $question->details['grading_rubric'] }}</p>
-                                        </div>
-                                    @elseif($question->type === 'fill_blank')
-                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Question with Blanks:</p>
-                                            <p class="text-gray-700 dark:text-gray-300 mb-2">{{ $question->details['blank_question'] }}</p>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Correct Answers:</p>
-                                            <p class="text-gray-700 dark:text-gray-300">{{ implode(', ', $question->details['blank_answers']) }}</p>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                                <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                                <p class="text-gray-500 dark:text-gray-400 text-lg">No questions added to this exam yet</p>
+                                <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Add questions from the question bank or create new ones</p>
+                                <a href="{{ route('admin.exams.edit', $exam) }}" class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Add Questions
+                                </a>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -299,8 +411,60 @@
                                 <i class="fas fa-edit mr-2"></i>
                                 Edit Exam
                             </a>
+
+                            <!-- Print/Export Button -->
+                            <a href="{{ route('admin.exams.print', $exam) }}" target="_blank"
+                               class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                <i class="fas fa-print mr-2"></i>
+                                Print Exam
+                            </a>
                         </div>
                     </div>
+
+                    <!-- Question Statistics -->
+                    @if($exam->questions->count() > 0)
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Question Statistics</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Question Types</h4>
+                                    <div class="space-y-2">
+                                        @php
+                                            $typeCounts = $exam->questions->groupBy('type')->map->count();
+                                        @endphp
+                                        @foreach($typeCounts as $type => $count)
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-sm text-gray-700 dark:text-gray-300 capitalize">
+                                                    {{ str_replace('_', ' ', $type) }}
+                                                </span>
+                                                <span class="font-semibold text-gray-900 dark:text-white">
+                                                    {{ $count }}
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Points Summary</h4>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-gray-700 dark:text-gray-300">Total Points</span>
+                                            <span class="font-semibold text-yellow-600 dark:text-yellow-400">
+                                                {{ $exam->questions->sum('pivot.points') }}
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-gray-700 dark:text-gray-300">Average per Question</span>
+                                            <span class="font-semibold text-gray-900 dark:text-white">
+                                                {{ number_format($exam->questions->avg('pivot.points'), 1) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
 
                     <!-- Recent Attempts -->
                     @if($exam->attempts->count() > 0)

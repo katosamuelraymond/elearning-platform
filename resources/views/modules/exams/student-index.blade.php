@@ -5,23 +5,35 @@
 @section('content')
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
             <div class="mb-8">
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">My Exams</h1>
-                <p class="text-gray-600 dark:text-gray-300 mt-2">
-                    View and take your scheduled exams
-                </p>
+                <p class="text-gray-600 dark:text-gray-300 mt-2">View and take your assigned exams</p>
             </div>
 
-            <!-- Stats -->
+            <!-- Debug Info -->
+            <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 dark:text-blue-400 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Student Information</h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                            <strong>Student:</strong> {{ Auth::user()->name }} |
+                            <strong>Class ID:</strong> {{ Auth::user()->class_id ?? 'NULL' }} |
+                            <strong>Class Name:</strong> {{ Auth::user()->class->name ?? 'Not Assigned' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                            <i class="fas fa-file-alt text-blue-600 dark:text-blue-400 text-xl"></i>
+                        <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 mr-4">
+                            <i class="fas fa-clipboard-list text-blue-600 dark:text-blue-400 text-xl"></i>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Total Exams</p>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Exams</p>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $stats['total'] }}</p>
                         </div>
                     </div>
@@ -29,11 +41,11 @@
 
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                            <i class="fas fa-play text-green-600 dark:text-green-400 text-xl"></i>
+                        <div class="p-3 rounded-full bg-green-100 dark:bg-green-900 mr-4">
+                            <i class="fas fa-play-circle text-green-600 dark:text-green-400 text-xl"></i>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Available Now</p>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Available</p>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $stats['available'] }}</p>
                         </div>
                     </div>
@@ -41,166 +53,248 @@
 
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
-                            <i class="fas fa-clock text-orange-600 dark:text-orange-400 text-xl"></i>
+                        <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900 mr-4">
+                            <i class="fas fa-clock text-yellow-600 dark:text-yellow-400 text-xl"></i>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Upcoming</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $stats['upcoming'] }}</p>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $stats['in_progress'] }}</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                        <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900 mr-4">
                             <i class="fas fa-check-circle text-purple-600 dark:text-purple-400 text-xl"></i>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Completed</p>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</p>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $stats['completed'] }}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Exams List -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Available Exams</h2>
+            @if(!Auth::user()->class_id)
+                <!-- No Class Assigned -->
+                <div class="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg p-6 text-center">
+                    <i class="fas fa-exclamation-triangle text-3xl text-yellow-600 dark:text-yellow-400 mb-4"></i>
+                    <h3 class="text-lg font-medium text-yellow-800 dark:text-yellow-300 mb-2">No Class Assigned</h3>
+                    <p class="text-yellow-700 dark:text-yellow-400 mb-4">
+                        You are not assigned to any class. Please contact your administrator to be assigned to a class.
+                    </p>
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 max-w-md mx-auto">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            <strong>Current Status:</strong><br>
+                            - Student: {{ Auth::user()->name }}<br>
+                            - Class ID: <span class="text-red-500">NULL/Not Set</span><br>
+                            - Email: {{ Auth::user()->email }}
+                        </p>
+                    </div>
+                </div>
+            @elseif($exams->count() > 0)
+                <!-- Filters and Exams Grid (existing code) -->
+                <!-- ... your existing filters and exams grid code ... -->
+
+                <!-- Filters -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                            <div class="flex space-x-4">
+                                <select id="status-filter" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+                                    <option value="">All Status</option>
+                                    <option value="available">Available</option>
+                                    <option value="upcoming">Upcoming</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="missed">Missed</option>
+                                </select>
+
+                                <select id="subject-filter" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+                                    <option value="">All Subjects</option>
+                                    @foreach($subjects as $subject)
+                                        <option value="{{ $subject->id }}">{{ $subject->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="relative">
+                                <input type="text" id="search-exams" placeholder="Search exams..." class="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white w-full md:w-64 text-sm">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                @if($exams->count() > 0)
-                    <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                        @foreach($exams as $exam)
-                            @php
-                                $attempt = $exam->attempts->first();
-                                $isActive = $exam->start_time <= now() && $exam->end_time >= now();
-                                $isUpcoming = $exam->start_time > now();
-                                $isPast = $exam->end_time < now();
-                                $canTakeExam = $isActive && (!$attempt || $exam->attempts->count() < $exam->max_attempts);
-                            @endphp
+                <!-- Exams Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" id="exams-grid">
+                    @foreach($exams as $exam)
+                        @php
+                            $status = $exam->getStatusForStudent(Auth::user());
+                            $statusText = $exam->getStatusTextForStudent(Auth::user());
+                            $statusBadgeClass = $exam->getStatusBadgeClassForStudent(Auth::user());
+                            $canAttempt = $exam->canStudentAttempt(Auth::user());
+                            $hasAttempts = $exam->attempts->isNotEmpty();
+                            $attemptsCount = $exam->attempts->count();
+                            $latestAttempt = $exam->attempts->sortByDesc('created_at')->first();
+                            $completionPercentage = $latestAttempt && $exam->total_marks > 0 ?
+                                ($latestAttempt->total_score / $exam->total_marks) * 100 : 0;
+                        @endphp
 
-                            <div class="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1">
-                                        <div class="flex items-center space-x-3 mb-2">
-                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                                <a href="{{ route('student.exams.show', $exam) }}" class="hover:text-blue-600 dark:hover:text-blue-400">
-                                                    {{ $exam->title }}
-                                                </a>
-                                            </h3>
-                                            <span class="px-2 py-1 text-xs font-medium rounded-full
-                                            {{ $isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                               ($isUpcoming ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                               'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200') }}">
-                                            {{ $isActive ? 'Active' : ($isUpcoming ? 'Upcoming' : 'Completed') }}
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200 exam-card"
+                             data-status="{{ $status }}"
+                             data-subject="{{ $exam->subject_id }}">
+                            <div class="p-6">
+                                <!-- Exam Header -->
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusBadgeClass }}">
+                                            {{ $statusText }}
                                         </span>
-                                            @if($attempt)
-                                                <span class="px-2 py-1 text-xs font-medium rounded-full
-                                                {{ $attempt->status === 'graded' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                                   ($attempt->status === 'submitted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                   'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200') }}">
-                                                {{ ucfirst($attempt->status) }}
-                                            </span>
-                                            @endif
-                                        </div>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                            <div class="flex items-center">
-                                                <i class="fas fa-book mr-2 text-purple-500"></i>
-                                                <span>{{ $exam->subject->name }}</span>
-                                            </div>
-                                            <div class="flex items-center">
-                                                <i class="fas fa-user mr-2 text-blue-500"></i>
-                                                <span>{{ $exam->teacher->name }}</span>
-                                            </div>
-                                            <div class="flex items-center">
-                                                <i class="fas fa-clock mr-2 text-orange-500"></i>
-                                                <span>{{ $exam->duration }} mins</span>
-                                            </div>
-                                            <div class="flex items-center">
-                                                <i class="fas fa-star mr-2 text-yellow-500"></i>
-                                                <span>{{ $exam->total_marks }} marks</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center space-x-4 text-sm">
-                                            <div class="flex items-center">
-                                                <i class="fas fa-calendar-start mr-2 text-green-500"></i>
-                                                <span>Starts: {{ $exam->start_time->format('M j, Y g:i A') }}</span>
-                                            </div>
-                                            <div class="flex items-center">
-                                                <i class="fas fa-calendar-end mr-2 text-red-500"></i>
-                                                <span>Ends: {{ $exam->end_time->format('M j, Y g:i A') }}</span>
-                                            </div>
-                                        </div>
-
-                                        @if($attempt && $attempt->total_score !== null)
-                                            <div class="mt-2">
-                                            <span class="font-medium text-gray-900 dark:text-white">
-                                                Score: {{ $attempt->total_score }}/{{ $exam->total_marks }}
-                                            </span>
-                                                @if($attempt->total_score >= $exam->passing_marks)
-                                                    <span class="ml-2 text-green-600 dark:text-green-400">✓ Passed</span>
-                                                @else
-                                                    <span class="ml-2 text-red-600 dark:text-red-400">✗ Failed</span>
-                                                @endif
-                                            </div>
-                                        @endif
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 ml-2">
+                                            {{ ucfirst(str_replace('_', ' ', $exam->type)) }}
+                                        </span>
                                     </div>
-
-                                    <div class="flex items-center space-x-3 ml-4">
-                                        @if($canTakeExam)
-                                            <a href="{{ route('student.exams.start', $exam) }}"
-                                               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
-                                                <i class="fas fa-play mr-2"></i>
-                                                {{ $attempt ? 'Continue' : 'Start Exam' }}
-                                            </a>
-                                        @elseif($attempt && $exam->show_results)
-                                            <a href="{{ route('student.exams.results', ['exam' => $exam, 'attempt' => $attempt]) }}"
-                                               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                                                <i class="fas fa-chart-bar mr-2"></i>
-                                                View Results
-                                            </a>
-                                        @elseif($isUpcoming)
-                                            <span class="text-sm text-gray-500 dark:text-gray-400">
-                                            Starts {{ $exam->start_time->diffForHumans() }}
-                                        </span>
-                                        @endif
-
-                                        <a href="{{ route('student.exams.show', $exam) }}"
-                                           class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
-                                            <i class="fas fa-info-circle mr-2"></i>
-                                            Details
-                                        </a>
+                                    <div class="text-right">
+                                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $exam->total_marks }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Points</p>
                                     </div>
                                 </div>
-                            </div>
-                        @endforeach
-                    </div>
 
-                    <!-- Pagination -->
-                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                                <!-- Exam Details -->
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ $exam->title }}</h3>
+                                <p class="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{{ $exam->description ?? 'No description' }}</p>
+
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-book mr-2 w-4"></i>
+                                        <span>{{ $exam->subject->name }}</span>
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-users mr-2 w-4"></i>
+                                        <span>{{ $exam->class->name }}</span>
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-clock mr-2 w-4"></i>
+                                        <span>{{ $exam->duration }} minutes</span>
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-calendar mr-2 w-4"></i>
+                                        <span>{{ $exam->start_time->format('M j, Y g:i A') }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Progress and Attempts -->
+                                <div class="mb-4">
+                                    @if($latestAttempt)
+                                        <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                            <span>Progress</span>
+                                            <span>{{ $latestAttempt->total_score ?? 0 }}/{{ $exam->total_marks }}</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $completionPercentage }}%"></div>
+                                        </div>
+                                    @endif
+
+                                    @if($attemptsCount > 0)
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                            Attempt {{ $attemptsCount }} of {{ $exam->max_attempts }}
+                                        </p>
+                                    @endif
+                                </div>
+
+                                <!-- Action Button -->
+                                <div class="flex space-x-2">
+                                    <a href="{{ route('student.exams.show', $exam) }}"
+                                       class="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm font-medium text-center transition-colors duration-200">
+                                        View Details
+                                    </a>
+
+                                    @if($canAttempt)
+                                        <a href="#"
+                                           class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium text-center transition-colors duration-200">
+                                            {{ $hasAttempts ? 'Continue' : 'Start Exam' }}
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <!-- Pagination -->
+                @if($exams->hasPages())
+                    <div class="mt-8">
                         {{ $exams->links() }}
                     </div>
-                @else
-                    <div class="text-center py-12">
-                        <i class="fas fa-file-alt text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-gray-500 dark:text-gray-400 text-lg">No exams available</p>
-                        <p class="text-gray-400 dark:text-gray-500 text-sm mt-1">You don't have any exams scheduled for your class yet.</p>
-                    </div>
                 @endif
-            </div>
-
-            <!-- Quick Links -->
-            <div class="mt-8 flex justify-center">
-                <a href=""
-                   class="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                    <i class="fas fa-history mr-3"></i>
-                    View My Exam History
-                </a>
-            </div>
+            @else
+                <!-- No Exams Message -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+                    <i class="fas fa-clipboard-list text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Exams Found</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">
+                        There are no exams assigned to your class ({{ Auth::user()->class->name ?? 'Class ID: ' . Auth::user()->class_id }}) at the moment.
+                    </p>
+                    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
+                        <p class="text-sm text-blue-700 dark:text-blue-400">
+                            <strong>Debug Information:</strong><br>
+                            - Student Class ID: {{ Auth::user()->class_id }}<br>
+                            - Student Class Name: {{ Auth::user()->class->name ?? 'Not found' }}<br>
+                            - Total Exams in System: {{ $stats['total'] }}<br>
+                            - Available Exams: {{ $stats['available'] }}
+                        </p>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
+
+    @if($exams->count() > 0)
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const statusFilter = document.getElementById('status-filter');
+                const subjectFilter = document.getElementById('subject-filter');
+                const searchInput = document.getElementById('search-exams');
+                const examCards = document.querySelectorAll('.exam-card');
+
+                function filterExams() {
+                    const statusValue = statusFilter.value;
+                    const subjectValue = subjectFilter.value;
+                    const searchValue = searchInput.value.toLowerCase();
+
+                    examCards.forEach(card => {
+                        const status = card.getAttribute('data-status');
+                        const subject = card.getAttribute('data-subject');
+                        const title = card.querySelector('h3').textContent.toLowerCase();
+                        const description = card.querySelector('p').textContent.toLowerCase();
+
+                        const statusMatch = !statusValue || status === statusValue;
+                        const subjectMatch = !subjectValue || subject === subjectValue;
+                        const searchMatch = !searchValue || title.includes(searchValue) || description.includes(searchValue);
+
+                        if (statusMatch && subjectMatch && searchMatch) {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                }
+
+                statusFilter.addEventListener('change', filterExams);
+                subjectFilter.addEventListener('change', filterExams);
+                searchInput.addEventListener('input', filterExams);
+            });
+        </script>
+    @endif
+
+    <style>
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
 @endsection

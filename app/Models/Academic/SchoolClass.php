@@ -78,4 +78,9 @@ class SchoolClass extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function students()
+    {
+        return $this->hasMany(User::class, 'class_id')->where('role', 'student');
+    }
 }

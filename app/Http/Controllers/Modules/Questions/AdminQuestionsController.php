@@ -77,7 +77,7 @@ class AdminQuestionsController extends Controller
 
         // AJAX request → return only #main-content
         if ($request->ajax()) {
-            return view('modules.questions.partials.table', $data)
+            return view('modules.questions.index', $data)
                 ->renderSections()['content'];
         }
 
@@ -140,7 +140,9 @@ class AdminQuestionsController extends Controller
                     // Type-specific validation
                     'correct_answer' => 'nullable|string',
                     'options' => 'nullable|array',
-                    'options.*' => 'nullable|string|max:500',
+                    'options.*' => 'required|string|max:500',
+                    'is_correct' => 'nullable|array',
+                    'is_correct.*' => 'nullable|boolean',
                     'expected_answer' => 'nullable|string',
                     'grading_rubric' => 'nullable|string',
                     'blank_question' => 'nullable|string',
@@ -160,7 +162,18 @@ class AdminQuestionsController extends Controller
                             }
                             return redirect()->back()->withInput()->with('error', $error);
                         }
-                        $correctAnswer = $validated['correct_answer'] ?? 0;
+
+                        // Find the correct option index
+                        $correctAnswer = 0;
+                        if (!empty($validated['is_correct'])) {
+                            foreach ($validated['is_correct'] as $index => $isCorrect) {
+                                if ($isCorrect == '1') {
+                                    $correctAnswer = $index;
+                                    break;
+                                }
+                            }
+                        }
+
                         $details['options'] = $validated['options'] ?? [];
                         break;
 
@@ -210,10 +223,12 @@ class AdminQuestionsController extends Controller
                 if ($validated['type'] === 'mcq' && !empty($validated['options'])) {
                     foreach ($validated['options'] as $index => $optionText) {
                         if (!empty(trim($optionText))) {
+                            $isCorrect = isset($validated['is_correct'][$index]) && $validated['is_correct'][$index] == '1';
+
                             QuestionOption::create([
                                 'question_id' => $question->id,
                                 'option_text' => trim($optionText),
-                                'is_correct' => ($index == $correctAnswer),
+                                'is_correct' => $isCorrect,
                                 'order' => $index,
                             ]);
                         }
@@ -334,7 +349,9 @@ class AdminQuestionsController extends Controller
                     // Type-specific validation
                     'correct_answer' => 'nullable|string',
                     'options' => 'nullable|array',
-                    'options.*' => 'nullable|string|max:500',
+                    'options.*' => 'required|string|max:500',
+                    'is_correct' => 'nullable|array',
+                    'is_correct.*' => 'nullable|boolean',
                     'expected_answer' => 'nullable|string',
                     'grading_rubric' => 'nullable|string',
                     'blank_question' => 'nullable|string',
@@ -354,7 +371,18 @@ class AdminQuestionsController extends Controller
                             }
                             return redirect()->back()->withInput()->with('error', $error);
                         }
-                        $correctAnswer = $validated['correct_answer'] ?? 0;
+
+                        // Find the correct option index
+                        $correctAnswer = 0;
+                        if (!empty($validated['is_correct'])) {
+                            foreach ($validated['is_correct'] as $index => $isCorrect) {
+                                if ($isCorrect == '1') {
+                                    $correctAnswer = $index;
+                                    break;
+                                }
+                            }
+                        }
+
                         $details['options'] = $validated['options'] ?? [];
                         break;
 
@@ -404,10 +432,12 @@ class AdminQuestionsController extends Controller
                 if ($validated['type'] === 'mcq' && !empty($validated['options'])) {
                     foreach ($validated['options'] as $index => $optionText) {
                         if (!empty(trim($optionText))) {
+                            $isCorrect = isset($validated['is_correct'][$index]) && $validated['is_correct'][$index] == '1';
+
                             QuestionOption::create([
                                 'question_id' => $question->id,
                                 'option_text' => trim($optionText),
-                                'is_correct' => ($index == $correctAnswer),
+                                'is_correct' => $isCorrect,
                                 'order' => $index,
                             ]);
                         }

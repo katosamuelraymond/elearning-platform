@@ -565,24 +565,24 @@
             const optionId = optionCount;
 
             const optionHTML = `
-        <div class="option-item option-default flex items-center space-x-3 p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-200 hover:scale-[1.02]" data-option-id="${optionId}">
-            <div class="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 dark:border-gray-500 cursor-pointer option-radio transition-all duration-200" data-option-id="${optionId}">
-                <div class="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 transition-all duration-200"></div>
-            </div>
-            <input type="text"
-                   name="options[${optionId}][text]"
-                   placeholder="Enter option ${optionId + 1}..."
-                   class="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium"
-                   required>
-            <input type="hidden" name="options[${optionId}][is_correct]" value="0" class="correct-input">
-            ${optionCount >= 2 ? `
-            <button type="button" onclick="removeMCQOption(${optionId})"
-                    class="text-gray-400 hover:text-red-500 transition-colors duration-200 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
-                <i class="fas fa-trash text-sm"></i>
-            </button>
-            ` : ''}
-        </div>
-    `;
+                <div class="option-item option-default flex items-center space-x-3 p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-200 hover:scale-[1.02]" data-option-id="${optionId}">
+                    <div class="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 dark:border-gray-500 cursor-pointer option-radio transition-all duration-200" data-option-id="${optionId}">
+                        <div class="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 transition-all duration-200"></div>
+                    </div>
+                    <input type="text"
+                           name="options[${optionId}]"
+                           placeholder="Enter option ${optionId + 1}..."
+                           class="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium"
+                           required>
+                    <input type="hidden" name="is_correct[${optionId}]" value="0" class="correct-input">
+                    ${optionCount >= 2 ? `
+                    <button type="button" onclick="removeMCQOption(${optionId})"
+                            class="text-gray-400 hover:text-red-500 transition-colors duration-200 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <i class="fas fa-trash text-sm"></i>
+                    </button>
+                    ` : ''}
+                </div>
+            `;
 
             optionsContainer.insertAdjacentHTML('beforeend', optionHTML);
             optionCount++;
@@ -618,11 +618,11 @@
                 radio.setAttribute('data-option-id', newId);
 
                 const textInput = item.querySelector('input[type="text"]');
-                textInput.name = `options[${newId}][text]`;
+                textInput.name = `options[${newId}]`;
                 textInput.placeholder = `Enter option ${newId + 1}...`;
 
                 const hiddenInput = item.querySelector('.correct-input');
-                hiddenInput.name = `options[${newId}][is_correct]`;
+                hiddenInput.name = `is_correct[${newId}]`;
 
                 // Update remove button if needed
                 const removeBtn = item.querySelector('button');
@@ -650,8 +650,11 @@
                 radio.classList.remove('bg-emerald-500', 'ring-4', 'ring-emerald-200');
                 radio.classList.add('bg-gray-300', 'dark:bg-gray-600');
 
-                const hiddenInput = item.querySelector('.correct-input');
-                hiddenInput.value = '0';
+                // Reset all correct inputs
+                const hiddenInputs = document.querySelectorAll('.correct-input');
+                hiddenInputs.forEach(input => {
+                    input.value = '0';
+                });
             });
 
             // Set selected option as correct
@@ -754,8 +757,6 @@
             }
         }
 
-        // Rest of your existing JavaScript functions (initializeAjaxForms, handleAjaxFormSubmit, etc.)
-        // ... keep all your existing AJAX form handling code from the previous version
         function initializeAjaxForms() {
             document.querySelectorAll('.ajax-form').forEach(form => {
                 form.removeEventListener('submit', handleAjaxFormSubmit);

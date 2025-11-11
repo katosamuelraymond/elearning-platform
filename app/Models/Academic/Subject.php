@@ -29,6 +29,11 @@ class Subject extends Model
                     ->withTimestamps();
     }
 
+    public function exams()
+    {
+        return $this->hasMany(\App\Models\Assessment\Exam::class);
+    }
+
     /**
      * Scope for compulsory subjects.
      */
