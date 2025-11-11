@@ -37,7 +37,9 @@
     </style>
 
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="//unpkg.com/alpinejs" defer></script>
+    <script src="https://unpkg.com/alpinejs" defer></script>
+
+
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-900 transition-colors duration-300 max-w-full overflow-x-hidden">
 

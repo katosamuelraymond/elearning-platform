@@ -17,6 +17,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+// Temporary test route - add this at the top of your admin routes
 
     // Subjects - COMPLETE CRUD OPERATIONS
     Route::prefix('subjects')->name('subjects.')->group(function () {
@@ -54,15 +55,18 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     });
 
     // Exams - COMPLETE CRUD OPERATIONS (Updated)
+
     Route::prefix('exams')->name('exams.')->group(function () {
         // CRUD Routes
         Route::get('/', [AdminExamsController::class, 'index'])->name('index');
+        Route::get('/question-bank', [AdminExamsController::class, 'getQuestionBank'])->name('question-bank');
+
         Route::get('/create', [AdminExamsController::class, 'create'])->name('create');
         Route::post('/', [AdminExamsController::class, 'store'])->name('store');
         Route::get('/{exam}', [AdminExamsController::class, 'show'])->name('show');
         Route::get('/{exam}/edit', [AdminExamsController::class, 'edit'])->name('edit');
         Route::put('/{exam}', [AdminExamsController::class, 'update'])->name('update');
-        Route::patch('/{exam}', [AdminExamsController::class, 'update']); // Alternative update
+        Route::patch('/{exam}', [AdminExamsController::class, 'update']);
         Route::delete('/{exam}', [AdminExamsController::class, 'destroy'])->name('destroy');
 
         // Exam Actions
@@ -71,6 +75,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Exam Attempts Management
         Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
+
+        // Question Bank Route - MAKE SURE THIS LINE EXISTS
+
     });
 
     Route::prefix('questions')->name('questions.')->group(function () {

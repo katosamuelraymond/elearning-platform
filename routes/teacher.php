@@ -41,6 +41,8 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
 
     Route::prefix('exams')->name('exams.')->group(function () {
         Route::get('/', [TeacherExamsController::class, 'index'])->name('index');
+        Route::get('/question-bank', [TeacherExamsController::class, 'getQuestionBank'])->name('question-bank');
+
         Route::get('/create', [TeacherExamsController::class, 'create'])->name('create');
         Route::post('/', [TeacherExamsController::class, 'store'])->name('store');
         Route::get('/{exam}', [TeacherExamsController::class, 'show'])->name('show');

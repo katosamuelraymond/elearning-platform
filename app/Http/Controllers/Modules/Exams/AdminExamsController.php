@@ -7,6 +7,7 @@ use App\Models\Assessment\Exam;
 use App\Models\Assessment\ExamAttempt;
 use App\Models\Academic\SchoolClass;
 use App\Models\Academic\Subject;
+use App\Models\Academic\TeacherAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Arr;
@@ -79,6 +80,61 @@ class AdminExamsController extends Controller
     }
 
     /**
+     * Get questions from the question bank with filters
+     */
+    public function getQuestionBank(Request $request)
+    {
+        $this->checkAdmin();
+        Log::info('🔍 DEBUG: AdminExamsController method called');
+
+        try {
+            $filters = $request->validate([
+                'subject_id' => 'nullable|exists:subjects,id',
+                'type' => 'nullable|in:mcq,true_false,short_answer,essay,fill_blank',
+                'difficulty' => 'nullable|in:easy,medium,hard',
+                'search' => 'nullable|string|max:255'
+            ]);
+
+            // FOR ADMIN USERS: Show all active questions from all subjects
+            $query = Question::with(['subject', 'options'])
+                ->where('is_active', true);
+
+            // Apply filters
+            if (!empty($filters['subject_id'])) {
+                $query->where('subject_id', $filters['subject_id']);
+            }
+
+            if (!empty($filters['type'])) {
+                $query->where('type', $filters['type']);
+            }
+
+            if (!empty($filters['difficulty'])) {
+                $query->where('difficulty', $filters['difficulty']);
+            }
+
+            if (!empty($filters['search'])) {
+                $query->where('question_text', 'like', '%' . $filters['search'] . '%');
+            }
+
+            $questions = $query->orderBy('created_at', 'desc')->get();
+
+            Log::info('🔍 Questions found:', ['count' => $questions->count()]);
+
+            return response()->json([
+                'success' => true,
+                'questions' => $questions
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch question bank:', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load questions from bank.'
+            ], 500);
+        }
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
@@ -106,11 +162,24 @@ class AdminExamsController extends Controller
                     // Hidden field for 'Save as Draft' logic
                     'is_draft' => 'required|in:0,1',
 
-                    // General question array validation (questions are required unless saving as draft)
-                    'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
+                    // Bank questions (comma-separated IDs)
+                    'selected_bank_questions' => 'nullable|string',
+
+                    // New questions
+                    'questions' => 'nullable|array',
                 ]);
 
-                // 2. Process Checkbox and Draft Status
+                // 2. Validate that we have at least one question if not draft
+                $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
+                $newQuestions = $validated['questions'] ?? [];
+
+                if ($validated['is_draft'] == '0' && empty($bankQuestions) && empty($newQuestions)) {
+                    throw ValidationException::withMessages([
+                        'questions' => 'At least one question is required for published exams.'
+                    ]);
+                }
+
+                // 3. Process Checkbox and Draft Status
                 $data = array_merge($validated, [
                     'teacher_id' => Auth::id(),
                     'randomize_questions' => $request->has('randomize_questions'),
@@ -119,13 +188,11 @@ class AdminExamsController extends Controller
                     'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
                 ]);
 
-                // 3. Create Exam
-                $exam = Exam::create(Arr::except($data, ['questions', 'is_draft']));
+                // 4. Create Exam
+                $exam = Exam::create(Arr::except($data, ['questions', 'selected_bank_questions', 'is_draft']));
 
-                // 4. Validate and Save Questions (conditional on questions existing)
-                if (isset($validated['questions']) && !empty($validated['questions'])) {
-                    $this->validateAndSaveQuestions($exam, $validated['questions']);
-                }
+                // 5. Attach questions from bank and create new questions
+                $this->attachQuestionsToExam($exam, $bankQuestions, $newQuestions);
 
                 $message = $exam->is_published ? 'Exam created and published successfully!' : 'Exam saved as draft successfully!';
 
@@ -133,11 +200,9 @@ class AdminExamsController extends Controller
                     ->with('success', $message);
 
             } catch (ValidationException $e) {
-                // Log the validation errors for debugging
                 Log::error('Exam creation validation failed:', ['errors' => $e->errors()]);
-                throw $e; // Re-throw to let Laravel handle the redirect with errors
+                throw $e;
             } catch (\Exception $e) {
-                // Log any other errors
                 Log::error('Exam creation failed:', ['error' => $e->getMessage()]);
                 return redirect()->back()
                     ->withInput()
@@ -147,12 +212,82 @@ class AdminExamsController extends Controller
     }
 
     /**
-     * Validate and save the nested question data to the database, ensuring schema compliance.
+     * Parse bank questions from comma-separated string
      */
-    private function validateAndSaveQuestions(Exam $exam, array $questionsData)
+    private function parseBankQuestions($bankQuestionsString)
     {
-        // Log the incoming data for debugging
-        Log::info('Questions data received:', ['questions' => $questionsData]);
+        if (empty($bankQuestionsString)) {
+            return [];
+        }
+
+        $questionIds = array_map('intval', explode(',', $bankQuestionsString));
+        $questionIds = array_filter($questionIds); // Remove empty values
+
+        // Verify these questions exist and belong to teacher's subjects
+        $assignedSubjectIds = TeacherAssignment::where('teacher_id', Auth::id())
+            ->where('is_active', true)
+            ->pluck('subject_id')
+            ->unique()
+            ->toArray();
+
+        $validQuestions = Question::whereIn('id', $questionIds)
+            ->whereIn('subject_id', $assignedSubjectIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->toArray();
+
+        return $validQuestions;
+    }
+
+    /**
+     * Attach questions to exam (both bank and new questions)
+     */
+    private function attachQuestionsToExam(Exam $exam, array $bankQuestionIds, array $newQuestionsData)
+    {
+        $questionOrder = 0;
+        $totalPoints = 0;
+
+        // 1. Attach bank questions
+        foreach ($bankQuestionIds as $questionId) {
+            $question = Question::find($questionId);
+            if ($question) {
+                $points = request()->input("bank_question_points.{$questionId}", $question->points);
+
+                $exam->questions()->attach($question->id, [
+                    'order' => $questionOrder++,
+                    'points' => $points
+                ]);
+
+                $totalPoints += $points;
+                Log::info('Bank question attached to exam:', [
+                    'exam_id' => $exam->id,
+                    'question_id' => $question->id,
+                    'points' => $points
+                ]);
+            }
+        }
+
+        // 2. Create and attach new questions
+        if (!empty($newQuestionsData)) {
+            $validatedNewQuestions = $this->validateAndSaveNewQuestions($exam, $newQuestionsData);
+
+            foreach ($validatedNewQuestions as $qData) {
+                $totalPoints += $qData['points'];
+                $questionOrder++;
+            }
+        }
+
+        // 3. Update exam total marks if needed (optional)
+        // You might want to update the exam's total_marks based on actual points
+        // $exam->update(['total_marks' => $totalPoints]);
+    }
+
+    /**
+     * Validate and save new questions
+     */
+    private function validateAndSaveNewQuestions(Exam $exam, array $questionsData)
+    {
+        Log::info('New questions data received:', ['questions' => $questionsData]);
 
         // Define validation rules for each question item
         $rules = [];
@@ -164,6 +299,7 @@ class AdminExamsController extends Controller
             $rules["{$index}.type"] = ['required', Rule::in(['mcq', 'true_false', 'short_answer', 'essay', 'fill_blank'])];
             $rules["{$index}.points"] = ['required', 'numeric', 'min:0.5', 'max:100'];
             $rules["{$index}.question_text"] = ['required', 'string'];
+            $rules["{$index}.save_to_bank"] = ['nullable', 'boolean'];
 
             // Type-specific rules
             switch ($questionType) {
@@ -196,15 +332,15 @@ class AdminExamsController extends Controller
         $validator = Validator::make($questionsData, $rules);
 
         if ($validator->fails()) {
-            // Log validation errors
-            Log::error('Question validation failed:', ['errors' => $validator->errors()->toArray()]);
+            Log::error('New question validation failed:', ['errors' => $validator->errors()->toArray()]);
             throw new ValidationException($validator);
         }
 
         $validatedQuestions = $validator->validated();
+        $savedQuestions = [];
 
         // Save questions
-        $questionOrder = 0;
+        $questionOrder = $exam->questions()->count();
         foreach ($validatedQuestions as $qData) {
             $details = [];
             $correctAnswer = null;
@@ -233,7 +369,7 @@ class AdminExamsController extends Controller
             }
 
             // Create the base Question record
-            $question = Question::create([
+            $questionData = [
                 'subject_id' => $exam->subject_id,
                 'created_by' => Auth::id(),
                 'type' => $qData['type'],
@@ -241,10 +377,22 @@ class AdminExamsController extends Controller
                 'question_text' => $qData['question_text'],
                 'details' => !empty($details) ? $details : null,
                 'correct_answer' => $correctAnswer,
-            ]);
+                'is_active' => true,
+            ];
+
+            // Save to bank if requested
+            if ($qData['save_to_bank'] ?? false) {
+                $questionData['is_bank_question'] = true;
+            }
+
+            $question = Question::create($questionData);
 
             // Log the created question
-            Log::info('Question created:', ['question_id' => $question->id, 'type' => $qData['type']]);
+            Log::info('New question created:', [
+                'question_id' => $question->id,
+                'type' => $qData['type'],
+                'save_to_bank' => $qData['save_to_bank'] ?? false
+            ]);
 
             // Attach to exam
             $exam->questions()->attach($question->id, [
@@ -262,16 +410,23 @@ class AdminExamsController extends Controller
                         'order' => $index,
                     ]);
                 }
-                Log::info('MCQ options created:', ['question_id' => $question->id, 'options_count' => count($qData['options'])]);
+                Log::info('MCQ options created:', [
+                    'question_id' => $question->id,
+                    'options_count' => count($qData['options'])
+                ]);
             }
+
+            $savedQuestions[] = $qData;
         }
 
-        Log::info('All questions saved successfully for exam:', ['exam_id' => $exam->id, 'questions_count' => count($validatedQuestions)]);
+        Log::info('All new questions saved successfully for exam:', [
+            'exam_id' => $exam->id,
+            'questions_count' => count($validatedQuestions)
+        ]);
+
+        return $savedQuestions;
     }
 
-    /**
-     * Display the specified resource.
-     */
     /**
      * Display the specified resource.
      */
@@ -346,10 +501,24 @@ class AdminExamsController extends Controller
 
                     'is_draft' => 'required|in:0,1',
 
-                    'questions' => $request->input('is_draft') == '0' ? 'required|array|min:1' : 'nullable|array',
+                    // Bank questions (comma-separated IDs)
+                    'selected_bank_questions' => 'nullable|string',
+
+                    // New questions
+                    'questions' => 'nullable|array',
                 ]);
 
-                // 2. Process Checkbox and Draft Status
+                // 2. Validate that we have at least one question if not draft
+                $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
+                $newQuestions = $validated['questions'] ?? [];
+
+                if ($validated['is_draft'] == '0' && empty($bankQuestions) && empty($newQuestions)) {
+                    throw ValidationException::withMessages([
+                        'questions' => 'At least one question is required for published exams.'
+                    ]);
+                }
+
+                // 3. Process Checkbox and Draft Status
                 $data = array_merge($validated, [
                     'randomize_questions' => $request->has('randomize_questions'),
                     'require_fullscreen' => $request->has('require_fullscreen'),
@@ -357,20 +526,22 @@ class AdminExamsController extends Controller
                     'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
                 ]);
 
-                // 3. Update Exam
-                $exam->update(Arr::except($data, ['questions', 'is_draft']));
+                // 4. Update Exam
+                $exam->update(Arr::except($data, ['questions', 'selected_bank_questions', 'is_draft']));
 
-                // 4. Clean up old questions and re-save new ones
+                // 5. Clean up old questions and re-attach
                 $questionIds = $exam->questions()->pluck('question_id');
                 $exam->questions()->detach(); // Remove pivot records
 
-                // Delete related options and the question records themselves
-                QuestionOption::whereIn('question_id', $questionIds)->delete();
-                Question::whereIn('id', $questionIds)->delete();
+                // Delete only new questions (not bank questions)
+                Question::whereIn('id', $questionIds)
+                    ->where('is_bank_question', false)
+                    ->delete();
 
-                if (isset($validated['questions']) && !empty($validated['questions'])) {
-                    $this->validateAndSaveQuestions($exam, $validated['questions']);
-                }
+                QuestionOption::whereIn('question_id', $questionIds)->delete();
+
+                // 6. Re-attach questions
+                $this->attachQuestionsToExam($exam, $bankQuestions, $newQuestions);
 
                 $message = $exam->is_published ? 'Exam updated and published successfully!' : 'Exam updated and saved as draft successfully!';
 
@@ -404,9 +575,12 @@ class AdminExamsController extends Controller
 
                 $exam->delete();
 
-                // Delete the related options and the question records themselves
+                // Delete only new questions (not bank questions)
+                Question::whereIn('id', $questionIds)
+                    ->where('is_bank_question', false)
+                    ->delete();
+
                 QuestionOption::whereIn('question_id', $questionIds)->delete();
-                Question::whereIn('id', $questionIds)->delete();
 
                 return redirect()->route('admin.exams.index')
                     ->with('success', 'Exam deleted successfully!');

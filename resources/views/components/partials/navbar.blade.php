@@ -13,15 +13,22 @@
                 @endauth
 
                 <!-- Logo -->
-                <a href="{{ auth()->check() ? (auth()->user()->isAdmin() ? route('admin.dashboard') : route('student.dashboard')) : url('/') }}"
+                <a href="{{ auth()->check()
+            ? (
+                auth()->user()->isAdmin() ? route('admin.dashboard')
+                : (auth()->user()->isTeacher() ? route('teacher.dashboard')
+                : route('student.dashboard'))
+              )
+            : url('/') }}"
                    class="flex items-center space-x-2">
                     <div class="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                         <i class="fas fa-graduation-cap text-white text-sm"></i>
                     </div>
                     <span class="text-xl font-bold text-gray-900 dark:text-white">
-                        Lincoln<span class="text-blue-600 dark:text-blue-400">Learn</span>
-                    </span>
+        Lincoln<span class="text-blue-600 dark:text-blue-400">Learn</span>
+    </span>
                 </a>
+
             </div>
 
 

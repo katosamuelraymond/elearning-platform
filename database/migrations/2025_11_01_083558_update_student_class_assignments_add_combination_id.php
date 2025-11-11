@@ -6,19 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        //
+        Schema::table('student_class_assignments', function (Blueprint $table) {
+            $table->foreignId('combination_id')->nullable()->constrained('subject_combinations')->onDelete('set null');
+            // We'll keep optional_subjects for O-Level choices
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        //
+        Schema::table('student_class_assignments', function (Blueprint $table) {
+            $table->dropForeign(['combination_id']);
+            $table->dropColumn('combination_id');
+        });
     }
 };
