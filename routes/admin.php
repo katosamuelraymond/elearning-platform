@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Modules\Teachers\AdminTeacherAssignmentController;
+use App\Http\Controllers\Modules\Students\StudentAssignmentController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Dashboard\AdminDashboardController;
 use App\Http\Controllers\Modules\Assignments\AdminAssignmentsController;
@@ -17,7 +18,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-// Temporary test route - add this at the top of your admin routes
 
     // Subjects - COMPLETE CRUD OPERATIONS
     Route::prefix('subjects')->name('subjects.')->group(function () {
@@ -29,6 +29,39 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('/{subject}', [AdminSubjectsController::class, 'update']); // Alternative update
         Route::delete('/{subject}', [AdminSubjectsController::class, 'destroy'])->name('destroy');
         Route::patch('/{subject}/toggle-status', [AdminSubjectsController::class, 'toggleStatus'])->name('toggle-status');
+    });
+
+    // Student Assignments - NEW SECTION
+    Route::prefix('student-assignments')->name('student-assignments.')->group(function () {
+        Route::get('/', [StudentAssignmentController::class, 'index'])->name('index');
+        Route::get('/create', [StudentAssignmentController::class, 'create'])->name('create');
+        Route::post('/', [StudentAssignmentController::class, 'store'])->name('store');
+        Route::post('/bulk-assign', [StudentAssignmentController::class, 'bulkAssign'])->name('bulk-assign');
+        Route::put('/{student}', [StudentAssignmentController::class, 'update'])->name('update');
+        Route::delete('/{student}', [StudentAssignmentController::class, 'destroy'])->name('destroy');
+
+        // AJAX Routes for dynamic loading
+        Route::get('/unassigned-students', [StudentAssignmentController::class, 'getUnassignedStudents'])->name('unassigned-students');
+        Route::get('/class/{class}/students', [StudentAssignmentController::class, 'getStudentsByClass'])->name('students-by-class');
+    });
+
+    // Teacher Assignments - COMPLETE CRUD OPERATIONS
+    Route::prefix('teacher-assignments')->name('teacher-assignments.')->group(function () {
+        Route::get('/', [AdminTeacherAssignmentController::class, 'index'])->name('index');
+        Route::get('/create', [AdminTeacherAssignmentController::class, 'create'])->name('create');
+        Route::post('/', [AdminTeacherAssignmentController::class, 'store'])->name('store');
+        Route::get('/{assignment}/edit', [AdminTeacherAssignmentController::class, 'edit'])->name('edit');
+        Route::put('/{assignment}', [AdminTeacherAssignmentController::class, 'update'])->name('update');
+        Route::delete('/{assignment}', [AdminTeacherAssignmentController::class, 'destroy'])->name('destroy');
+        Route::post('/{assignment}/toggle-status', [AdminTeacherAssignmentController::class, 'toggleStatus'])->name('toggle-status');
+
+        // AJAX Routes for dynamic loading
+        Route::get('/{teacher}/assignments', [AdminTeacherAssignmentController::class, 'getTeacherAssignments'])->name('get-teacher');
+        Route::get('/{teacher}/available-subjects', [AdminTeacherAssignmentController::class, 'getAvailableSubjects'])->name('available-subjects');
+        Route::get('/{teacher}/available-classes', [AdminTeacherAssignmentController::class, 'getAvailableClasses'])->name('available-classes');
+
+        // Add this route for class streams
+        Route::get('/classes/{class}/streams', [AdminTeacherAssignmentController::class, 'getClassStreams'])->name('class-streams');
     });
 
     // Assignments - COMPLETE CRUD OPERATIONS
@@ -55,12 +88,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     });
 
     // Exams - COMPLETE CRUD OPERATIONS (Updated)
-
     Route::prefix('exams')->name('exams.')->group(function () {
         // CRUD Routes
         Route::get('/', [AdminExamsController::class, 'index'])->name('index');
         Route::get('/question-bank', [AdminExamsController::class, 'getQuestionBank'])->name('question-bank');
-
         Route::get('/create', [AdminExamsController::class, 'create'])->name('create');
         Route::post('/', [AdminExamsController::class, 'store'])->name('store');
         Route::get('/{exam}', [AdminExamsController::class, 'show'])->name('show');
@@ -69,20 +100,19 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('/{exam}', [AdminExamsController::class, 'update']);
         Route::delete('/{exam}', [AdminExamsController::class, 'destroy'])->name('destroy');
 
-        Route::get('admin/exams/{exam}/print', [AdminExamsController::class, 'print'])->name('print');
-        Route::get('admin/exams/{exam}/print-pdf', [AdminExamsController::class, 'printPDF'])->name('print-pdf');
-
+        Route::get('/{exam}/print', [AdminExamsController::class, 'print'])->name('print');
+        Route::get('/{exam}/print-pdf', [AdminExamsController::class, 'printPDF'])->name('print-pdf');
 
         // Exam Actions
         Route::patch('/{exam}/toggle-publish', [AdminExamsController::class, 'togglePublish'])->name('toggle-publish');
-        Route::patch('admin/exams/{exam}/toggle-archive', [AdminExamsController::class, 'toggleArchive'])->name('toggle-archive');
+        Route::patch('/{exam}/toggle-archive', [AdminExamsController::class, 'toggleArchive'])->name('toggle-archive');
 
         // Exam Attempts Management
         Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
         Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
+    });
 
-           });
-
+    // Questions
     Route::prefix('questions')->name('questions.')->group(function () {
         Route::get('/', [AdminQuestionsController::class, 'index'])->name('index');
         Route::get('/create', [AdminQuestionsController::class, 'create'])->name('create');
@@ -92,25 +122,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::put('/{question}', [AdminQuestionsController::class, 'update'])->name('update');
         Route::delete('/{question}', [AdminQuestionsController::class, 'destroy'])->name('destroy');
         Route::patch('/{question}/toggle-status', [AdminQuestionsController::class, 'toggleStatus'])->name('toggle-status');
-    });
-
-    // Teacher Assignments - COMPLETE CRUD OPERATIONS
-    Route::prefix('teacher-assignments')->name('teacher-assignments.')->group(function () {
-        Route::get('/', [AdminTeacherAssignmentController::class, 'index'])->name('index');
-        Route::get('/create', [AdminTeacherAssignmentController::class, 'create'])->name('create');
-        Route::post('/', [AdminTeacherAssignmentController::class, 'store'])->name('store');
-        Route::get('/{assignment}/edit', [AdminTeacherAssignmentController::class, 'edit'])->name('edit');
-        Route::put('/{assignment}', [AdminTeacherAssignmentController::class, 'update'])->name('update');
-        Route::delete('/{assignment}', [AdminTeacherAssignmentController::class, 'destroy'])->name('destroy');
-        Route::post('/{assignment}/toggle-status', [AdminTeacherAssignmentController::class, 'toggleStatus'])->name('toggle-status');
-
-        // AJAX Routes for dynamic loading
-        Route::get('/{teacher}/assignments', [AdminTeacherAssignmentController::class, 'getTeacherAssignments'])->name('get-teacher');
-        Route::get('/{teacher}/available-subjects', [AdminTeacherAssignmentController::class, 'getAvailableSubjects'])->name('available-subjects');
-        Route::get('/{teacher}/available-classes', [AdminTeacherAssignmentController::class, 'getAvailableClasses'])->name('available-classes');
-
-        // Add this route for class streams
-        Route::get('/classes/{class}/streams', [AdminTeacherAssignmentController::class, 'getClassStreams'])->name('class-streams');
     });
 
     // Quizzes

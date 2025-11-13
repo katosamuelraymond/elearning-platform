@@ -5,8 +5,7 @@ namespace App\Models\Academic;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use App\Models\TeacherAssignment;
-use App\Models\StudentClassAssignment;
+use App\Models\User;
 
 class SchoolClass extends Model
 {
@@ -35,8 +34,8 @@ class SchoolClass extends Model
     public function subjects(): BelongsToMany
     {
         return $this->belongsToMany(Subject::class, 'class_subject', 'class_id', 'subject_id')
-                    ->withPivot('periods_per_week')
-                    ->withTimestamps();
+            ->withPivot('periods_per_week')
+            ->withTimestamps();
     }
 
     /**
@@ -53,6 +52,29 @@ class SchoolClass extends Model
     public function teacherAssignments(): HasMany
     {
         return $this->hasMany(TeacherAssignment::class, 'class_id');
+    }
+
+    /**
+     * Get the students assigned to this class through class assignments.
+     */
+    public function students()
+    {
+        return $this->hasManyThrough(
+            User::class,
+            StudentClassAssignment::class,
+            'class_id', // Foreign key on student_class_assignments table
+            'id', // Foreign key on users table
+            'id', // Local key on school_classes table
+            'student_id' // Local key on student_class_assignments table
+        )->where('student_class_assignments.status', 'active');
+    }
+
+    /**
+     * Get the exams for this class.
+     */
+    public function exams()
+    {
+        return $this->hasMany(\App\Models\Assessment\Exam::class, 'class_id');
     }
 
     /**
@@ -77,10 +99,5 @@ class SchoolClass extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-
-    public function students()
-    {
-        return $this->hasMany(User::class, 'class_id')->where('role', 'student');
     }
 }

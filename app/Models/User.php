@@ -1,10 +1,11 @@
 <?php
 
 namespace App\Models;
-use App\Models\Academic\StudentClassAssignment;
 
+use App\Models\Academic\StudentClassAssignment;
 use App\Models\Academic\Subject;
 use App\Models\Academic\TeacherAssignment;
+use App\Models\Academic\SchoolClass; // Add this import
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -20,7 +21,6 @@ class User extends Authenticatable
         'profile_image',
         'is_active',
         'created_by'
-        // REMOVED: 'role' - we use roles relationship instead
     ];
 
     protected $hidden = [
@@ -59,6 +59,98 @@ class User extends Authenticatable
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Get the student class assignments for the user.
+     */
+    public function studentClassAssignments()
+    {
+        return $this->hasMany(StudentClassAssignment::class, 'student_id');
+    }
+
+    /**
+     * Get the current active class assignment for the student.
+     */
+    public function currentClassAssignment()
+    {
+        return $this->hasOne(StudentClassAssignment::class, 'student_id')
+            ->where('status', 'active')
+            ->latest();
+    }
+
+    /**
+     * Get the current class through active class assignment.
+     */
+    public function currentClass()
+    {
+        return $this->hasOneThrough(
+            SchoolClass::class,
+            StudentClassAssignment::class,
+            'student_id', // Foreign key on student_class_assignments table
+            'id', // Foreign key on school_classes table
+            'id', // Local key on users table
+            'class_id' // Local key on student_class_assignments table
+        )->where('student_class_assignments.status', 'active');
+    }
+
+    /**
+     * Get the teacher assignments for the user.
+     */
+    public function teacherAssignments()
+    {
+        return $this->hasMany(TeacherAssignment::class, 'teacher_id');
+    }
+
+    /**
+     * Get the classes taught by the teacher.
+     */
+    public function taughtClasses()
+    {
+        return $this->hasManyThrough(
+            SchoolClass::class,
+            TeacherAssignment::class,
+            'teacher_id',
+            'id',
+            'id',
+            'class_id'
+        )->distinct();
+    }
+
+    /**
+     * Get the subjects taught by the teacher.
+     */
+    public function taughtSubjects()
+    {
+        return $this->hasManyThrough(
+            Subject::class,
+            TeacherAssignment::class,
+            'teacher_id',
+            'id',
+            'id',
+            'subject_id'
+        )->distinct();
+    }
+
+    /**
+     * Get the subjects taught by the teacher through assignments
+     */
+    public function subjects()
+    {
+        return $this->hasManyThrough(
+            Subject::class,
+            TeacherAssignment::class,
+            'teacher_id',
+            'id',
+            'id',
+            'subject_id'
+        )->distinct();
+    }
+
+    // REMOVE THIS INCORRECT RELATIONSHIP:
+    // public function class()
+    // {
+    //     return $this->belongsTo(SchoolClass::class, 'class_id');
+    // }
+
     // ========== ROLE METHODS ==========
 
     public function hasRole($roleName)
@@ -76,7 +168,6 @@ class User extends Authenticatable
         return $this->roles->first()->name ?? null;
     }
 
-    // UPDATED: Use only roles relationship, no role column
     public function isStudent()
     {
         return $this->hasRole('student');
@@ -90,6 +181,56 @@ class User extends Authenticatable
     public function isAdmin()
     {
         return $this->hasRole('admin');
+    }
+
+    // ========== CONVENIENCE METHODS ==========
+
+    /**
+     * Get the current class ID for student (via class assignment)
+     */
+    public function getCurrentClassIdAttribute()
+    {
+        if (!$this->isStudent()) {
+            return null;
+        }
+
+        return $this->currentClassAssignment->class_id ?? null;
+    }
+
+    /**
+     * Get the current class name for student
+     */
+    public function getCurrentClassNameAttribute()
+    {
+        if (!$this->isStudent()) {
+            return null;
+        }
+
+        return $this->currentClassAssignment->class->name ?? null;
+    }
+
+    /**
+     * Get the current stream for student
+     */
+    public function getCurrentStreamAttribute()
+    {
+        if (!$this->isStudent()) {
+            return null;
+        }
+
+        return $this->currentClassAssignment->stream ?? null;
+    }
+
+    /**
+     * Get the current academic year for student
+     */
+    public function getCurrentAcademicYearAttribute()
+    {
+        if (!$this->isStudent()) {
+            return null;
+        }
+
+        return $this->currentClassAssignment->academic_year ?? null;
     }
 
     // ========== PROFILE DATA ACCESSORS ==========
@@ -186,7 +327,6 @@ class User extends Authenticatable
 
     // ========== SCOPES ==========
 
-    // UPDATED: Use roles relationship instead of role column
     public function scopeStudents($query)
     {
         return $query->whereHas('roles', function ($q) {
@@ -246,88 +386,79 @@ class User extends Authenticatable
         return $this->education_level === 'A';
     }
 
+    /**
+     * Get the primary role name for route generation
+     */
+    public function getRouteRoleAttribute()
+    {
+        $primaryRole = $this->primaryRole;
 
-/**
- * Get the primary role name for route generation
- */
-public function getRouteRoleAttribute()
-{
-    $primaryRole = $this->primaryRole;
+        $roleMap = [
+            'admin' => 'admin',
+            'teacher' => 'teacher',
+            'student' => 'student'
+        ];
 
-    // Map role names to route prefixes if needed
-    $roleMap = [
-        'admin' => 'admin',
-        'teacher' => 'teacher',
-        'student' => 'student'
-    ];
-
-    return $roleMap[$primaryRole] ?? $primaryRole;
-}
-  /**
- * Generate student ID in format: 23/A/0001/F
- */
-public function generateStudentId()
-{
-    // Make sure user is a student and has a profile
-    if (!method_exists($this, 'isStudent') || !$this->isStudent() || !$this->profile) {
-        return null;
+        return $roleMap[$primaryRole] ?? $primaryRole;
     }
 
-    // Safely get data from profile
-    $admissionYear = $this->profile->admission_year
-        ? substr($this->profile->admission_year, -2)
-        : '00';
+    /**
+     * Generate student ID in format: 23/A/0001/F
+     */
+    public function generateStudentId()
+    {
+        if (!$this->isStudent() || !$this->profile) {
+            return null;
+        }
 
-    $educationLevel = $this->profile->education_level ?? 'O'; // default to 'O' level
-    $admissionNumber = $this->profile->admission_number ?? '0';
+        $admissionYear = $this->profile->admission_year
+            ? substr($this->profile->admission_year, -2)
+            : '00';
 
-    // Ensure it's always 4 digits
-    $admissionNumber = str_pad($admissionNumber, 4, '0', STR_PAD_LEFT);
+        $educationLevel = $this->profile->education_level ?? 'O';
+        $admissionNumber = $this->profile->admission_number ?? '0';
+        $admissionNumber = str_pad($admissionNumber, 4, '0', STR_PAD_LEFT);
+        $gender = $this->profile->gender ?? 'M';
 
-    $gender = $this->profile->gender ?? 'M';
+        return sprintf('%s/%s/%s/%s',
+            $admissionYear,
+            strtoupper($educationLevel),
+            $admissionNumber,
+            strtoupper($gender)
+        );
+    }
 
-    return sprintf('%s/%s/%s/%s',
-        $admissionYear,
-        strtoupper($educationLevel),
-        $admissionNumber,
-        strtoupper($gender)
-    );
-}
+    /**
+     * Generate school email from student ID: 23/A/0001/F@lhs.ac.ug
+     */
+    public function generateSchoolEmail()
+    {
+        if (!$this->isStudent()) return null;
 
+        $studentId = $this->generateStudentId();
+        return $studentId ? $studentId . '@lhs.ac.ug' : null;
+    }
 
-/**
- * Generate school email from student ID: 23/A/0001/F@lhs.ac.ug
- */
-public function generateSchoolEmail()
-{
-    if (!$this->isStudent()) return null;
+    /**
+     * Generate admission number with 4-digit format
+     */
+    public static function generateAdmissionNumber($admissionYear, $studentType, $educationLevel)
+    {
+        $lastStudent = static::whereHas('profile', function ($query) use ($admissionYear, $studentType, $educationLevel) {
+            $query->where('admission_year', $admissionYear)
+                ->where('student_type', $studentType)
+                ->where('education_level', $educationLevel);
+        })->with('profile')
+            ->get()
+            ->sortByDesc(function ($user) {
+                return (int) $user->profile->admission_number;
+            })
+            ->first();
 
-    $studentId = $this->generateStudentId();
-    return $studentId ? $studentId . '@lhs.ac.ug' : null;
-}
+        $lastNumber = $lastStudent ? (int)$lastStudent->profile->admission_number : 0;
+        return str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+    }
 
-/**
- * Generate admission number with 4-digit format
- */
-/**
- * Generate admission number with 4-digit format
- */
-public static function generateAdmissionNumber($admissionYear, $studentType, $educationLevel)
-{
-    $lastStudent = static::whereHas('profile', function ($query) use ($admissionYear, $studentType, $educationLevel) {
-        $query->where('admission_year', $admissionYear)
-              ->where('student_type', $studentType)
-              ->where('education_level', $educationLevel);
-    })->with('profile') // Add this to eager load the profile
-      ->get()
-      ->sortByDesc(function ($user) {
-          return (int) $user->profile->admission_number; // Access through the relationship
-      })
-      ->first();
-
-    $lastNumber = $lastStudent ? (int)$lastStudent->profile->admission_number : 0;
-    return str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-}
     public static function createALevelStudent(User $oLevelStudent, $newAdmissionYear)
     {
         $newAdmissionNumber = static::generateAdmissionNumber($newAdmissionYear, $oLevelStudent->student_type, 'A');
@@ -341,7 +472,6 @@ public static function generateAdmissionNumber($admissionYear, $studentType, $ed
             'created_by' => auth()->id() ?? $oLevelStudent->created_by,
         ]);
 
-        // Attach student role
         $newStudent->roles()->attach(Role::where('name', 'student')->first()->id);
 
         Profile::create([
@@ -387,73 +517,4 @@ public static function generateAdmissionNumber($admissionYear, $studentType, $ed
         if (!$this->isStudent()) return null;
         return $this->education_level === 'O' ? 'O-Level' : 'A-Level';
     }
-    // In User model, add these relationships:
-
-/**
- * Get the teacher assignments for the user.
- */
-public function teacherAssignments()
-{
-    return $this->hasMany(TeacherAssignment::class, 'teacher_id');
-}
-
-/**
- * Get the student class assignments for the user.
- */
-public function studentClassAssignments()
-{
-    return $this->hasMany(StudentClassAssignment::class, 'student_id');
-}
-
-/**
- * Get the classes taught by the teacher.
- */
-public function taughtClasses()
-{
-    return $this->hasManyThrough(
-        Academic\SchoolClass::class,
-        TeacherAssignment::class,
-        'teacher_id',
-        'id',
-        'id',
-        'class_id'
-    )->distinct();
-}
-
-/**
- * Get the subjects taught by the teacher.
- */
-public function taughtSubjects()
-{
-    return $this->hasManyThrough(
-        Academic\Subject::class,
-        TeacherAssignment::class,
-        'teacher_id',
-        'id',
-        'id',
-        'subject_id'
-    )->distinct();
-}
-
-    /**
-     * Get the subjects taught by the teacher through assignments
-     */
-    public function subjects()
-    {
-        return $this->hasManyThrough(
-            Subject::class,
-            TeacherAssignment::class,
-            'teacher_id', // Foreign key on TeacherAssignment table
-            'id', // Foreign key on Subject table
-            'id', // Local key on User table
-            'subject_id' // Local key on TeacherAssignment table
-        )->distinct();
-    }
-
-    public function class()
-    {
-        return $this->belongsTo(\App\Models\Academic\SchoolClass::class, 'class_id');
-    }
-
-
 }

@@ -50,6 +50,18 @@ Route::middleware('auth')->prefix('student')->name('student.')->group(function (
 
         // View Results
         Route::get('/{exam}/results/{attempt}', [StudentExamsController::class, 'results'])->name('results');
+
+        // Save Progress (AJAX)
+        Route::post('/{exam}/save-progress/{attempt}', [StudentExamsController::class, 'saveProgress'])->name('save-progress');
+
+        // Get Progress (AJAX)
+        Route::get('/{exam}/progress/{attempt}', [StudentExamsController::class, 'getProgress'])->name('get-progress');
+
+        // Submit Exam Attempt
+        Route::post('/{exam}/submit/{attempt}', [StudentExamsController::class, 'submit'])->name('submit');
+
+        // View Results
+        Route::get('/{exam}/results/{attempt}', [StudentExamsController::class, 'results'])->name('results');
     });
 
     Route::prefix('quizzes')->name('quizzes.')->group(function () {

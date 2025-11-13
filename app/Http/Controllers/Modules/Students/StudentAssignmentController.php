@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Modules\Students;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Profile;
 use App\Models\Academic\SchoolClass;
+use App\Models\Academic\Stream;
+use App\Models\Academic\StudentClassAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,8 +21,11 @@ class StudentAssignmentController extends Controller
     {
         Log::debug('StudentAssignmentController: index method called');
 
-        // Get students with their class information
-        $query = User::students()->with(['class']);
+        // Get students with their class assignments
+        $query = User::with(['roles', 'profile', 'studentClassAssignments.class', 'studentClassAssignments.stream'])
+            ->whereHas('roles', function($q) {
+                $q->where('name', 'student');
+            });
 
         // Search functionality
         if ($request->has('search') && $request->search != '') {
@@ -27,8 +33,10 @@ class StudentAssignmentController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
                     ->orWhere('email', 'LIKE', "%{$search}%")
-                    ->orWhere('student_id', 'LIKE', "%{$search}%")
-                    ->orWhereHas('class', function($q2) use ($search) {
+                    ->orWhereHas('profile', function($q2) use ($search) {
+                        $q2->where('student_id', 'LIKE', "%{$search}%");
+                    })
+                    ->orWhereHas('studentClassAssignments.class', function($q2) use ($search) {
                         $q2->where('name', 'LIKE', "%{$search}%");
                     });
             });
@@ -36,26 +44,36 @@ class StudentAssignmentController extends Controller
 
         // Filter by class
         if ($request->has('class_id') && $request->class_id != '') {
-            $query->where('class_id', $request->class_id);
+            $query->whereHas('studentClassAssignments', function($q) use ($request) {
+                $q->where('class_id', $request->class_id);
+            });
         }
 
         // Filter by assignment status
         if ($request->has('assignment_status') && $request->assignment_status != '') {
             if ($request->assignment_status === 'assigned') {
-                $query->whereNotNull('class_id');
+                $query->whereHas('studentClassAssignments');
             } elseif ($request->assignment_status === 'unassigned') {
-                $query->whereNull('class_id');
+                $query->whereDoesntHave('studentClassAssignments');
             }
         }
 
         $students = $query->latest()->paginate(20);
-
         $classes = SchoolClass::where('is_active', true)->orderBy('level')->orderBy('name')->get();
 
+        // Get stats
+        $totalStudents = User::whereHas('roles', function($q) {
+            $q->where('name', 'student');
+        })->count();
+
+        $assignedStudents = User::whereHas('roles', function($q) {
+            $q->where('name', 'student');
+        })->whereHas('studentClassAssignments')->count();
+
         $stats = [
-            'total' => User::students()->count(),
-            'assigned' => User::students()->whereNotNull('class_id')->count(),
-            'unassigned' => User::students()->whereNull('class_id')->count(),
+            'total' => $totalStudents,
+            'assigned' => $assignedStudents,
+            'unassigned' => $totalStudents - $assignedStudents,
         ];
 
         Log::debug('StudentAssignmentController: Data loaded for index', [
@@ -82,8 +100,13 @@ class StudentAssignmentController extends Controller
     {
         Log::debug('StudentAssignmentController: create method called');
 
-        $students = User::students()->whereNull('class_id')->get();
+        // Get unassigned students
+        $students = User::whereHas('roles', function($q) {
+            $q->where('name', 'student');
+        })->whereDoesntHave('studentClassAssignments')->get();
+
         $classes = SchoolClass::where('is_active', true)->orderBy('level')->orderBy('name')->get();
+        $streams = Stream::where('is_active', true)->orderBy('name')->get();
 
         Log::debug('StudentAssignmentController: Create form data loaded', [
             'unassigned_students_count' => $students->count(),
@@ -93,6 +116,7 @@ class StudentAssignmentController extends Controller
         return $this->renderView('modules.students.assignments.create', [
             'students' => $students,
             'classes' => $classes,
+            'streams' => $streams,
             'showNavbar' => true,
             'showSidebar' => true,
             'showFooter' => true
@@ -110,7 +134,9 @@ class StudentAssignmentController extends Controller
 
         $validated = $request->validate([
             'student_id' => 'required|exists:users,id',
-            'class_id' => 'required|exists:school_classes,id'
+            'class_id' => 'required|exists:school_classes,id',
+            'stream_id' => 'required|exists:streams,id',
+            'academic_year' => 'required|string'
         ]);
 
         try {
@@ -118,15 +144,26 @@ class StudentAssignmentController extends Controller
 
             $student = User::findOrFail($validated['student_id']);
             $class = SchoolClass::findOrFail($validated['class_id']);
+            $stream = Stream::findOrFail($validated['stream_id']);
 
-            // Check if student is already assigned to a class
-            if ($student->class_id) {
-                $currentClass = SchoolClass::find($student->class_id);
-                throw new \Exception("Student is already assigned to class: {$currentClass->name}");
+            // Check if student already has an active class assignment
+            $existingAssignment = StudentClassAssignment::where('student_id', $student->id)
+                ->where('status', 'active')
+                ->first();
+
+            if ($existingAssignment) {
+                $currentClass = $existingAssignment->class;
+                $currentStream = $existingAssignment->stream;
+                throw new \Exception("Student is already assigned to class: {$currentClass->name} - {$currentStream->name}");
             }
 
-            $student->update([
-                'class_id' => $validated['class_id']
+            // Create new class assignment
+            StudentClassAssignment::create([
+                'student_id' => $student->id,
+                'class_id' => $validated['class_id'],
+                'stream_id' => $validated['stream_id'],
+                'academic_year' => $validated['academic_year'],
+                'status' => 'active'
             ]);
 
             DB::commit();
@@ -135,11 +172,13 @@ class StudentAssignmentController extends Controller
                 'student_id' => $student->id,
                 'student_name' => $student->name,
                 'class_id' => $class->id,
-                'class_name' => $class->name
+                'class_name' => $class->name,
+                'stream_id' => $stream->id,
+                'stream_name' => $stream->name
             ]);
 
             return redirect()->route('admin.student-assignments.index')
-                ->with('success', "Student {$student->name} successfully assigned to class {$class->name}!");
+                ->with('success', "Student {$student->name} successfully assigned to class {$class->name} - {$stream->name}!");
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -166,13 +205,16 @@ class StudentAssignmentController extends Controller
         $validated = $request->validate([
             'student_ids' => 'required|array|min:1',
             'student_ids.*' => 'exists:users,id',
-            'class_id' => 'required|exists:school_classes,id'
+            'class_id' => 'required|exists:school_classes,id',
+            'stream_id' => 'required|exists:streams,id',
+            'academic_year' => 'required|string'
         ]);
 
         try {
             DB::beginTransaction();
 
             $class = SchoolClass::findOrFail($validated['class_id']);
+            $stream = Stream::findOrFail($validated['stream_id']);
             $successCount = 0;
             $errorCount = 0;
             $errors = [];
@@ -180,29 +222,40 @@ class StudentAssignmentController extends Controller
             foreach ($validated['student_ids'] as $studentId) {
                 $student = User::findOrFail($studentId);
 
-                // Check if student is already assigned to a class
-                if ($student->class_id) {
-                    $currentClass = SchoolClass::find($student->class_id);
+                // Check if student already has an active class assignment
+                $existingAssignment = StudentClassAssignment::where('student_id', $student->id)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($existingAssignment) {
+                    $currentClass = $existingAssignment->class;
+                    $currentStream = $existingAssignment->stream;
                     $errorCount++;
-                    $errors[] = "{$student->name} is already assigned to class: {$currentClass->name}";
+                    $errors[] = "{$student->name} is already assigned to class: {$currentClass->name} - {$currentStream->name}";
                     continue;
                 }
 
-                $student->update([
-                    'class_id' => $validated['class_id']
+                // Create new class assignment
+                StudentClassAssignment::create([
+                    'student_id' => $student->id,
+                    'class_id' => $validated['class_id'],
+                    'stream_id' => $validated['stream_id'],
+                    'academic_year' => $validated['academic_year'],
+                    'status' => 'active'
                 ]);
 
                 $successCount++;
                 Log::debug('StudentAssignmentController: Student bulk assigned', [
                     'student_id' => $student->id,
                     'student_name' => $student->name,
-                    'class_id' => $class->id
+                    'class_id' => $class->id,
+                    'stream_id' => $stream->id
                 ]);
             }
 
             DB::commit();
 
-            $message = "{$successCount} students successfully assigned to class {$class->name}!";
+            $message = "{$successCount} students successfully assigned to class {$class->name} - {$stream->name}!";
 
             if ($errorCount > 0) {
                 $message .= " {$errorCount} assignments failed.";
@@ -245,17 +298,36 @@ class StudentAssignmentController extends Controller
         ]);
 
         $validated = $request->validate([
-            'class_id' => 'required|exists:school_classes,id'
+            'class_id' => 'required|exists:school_classes,id',
+            'stream_id' => 'required|exists:streams,id',
+            'academic_year' => 'required|string'
         ]);
 
         try {
             DB::beginTransaction();
 
-            $oldClass = $student->class ? $student->class->name : 'No Class';
-            $newClass = SchoolClass::findOrFail($validated['class_id']);
+            $class = SchoolClass::findOrFail($validated['class_id']);
+            $stream = Stream::findOrFail($validated['stream_id']);
 
-            $student->update([
-                'class_id' => $validated['class_id']
+            // Get current assignment
+            $currentAssignment = StudentClassAssignment::where('student_id', $student->id)
+                ->where('status', 'active')
+                ->first();
+
+            $oldClass = $currentAssignment ? "{$currentAssignment->class->name} - {$currentAssignment->stream->name}" : 'No Class';
+
+            // Deactivate current assignment
+            if ($currentAssignment) {
+                $currentAssignment->update(['status' => 'inactive']);
+            }
+
+            // Create new assignment
+            StudentClassAssignment::create([
+                'student_id' => $student->id,
+                'class_id' => $validated['class_id'],
+                'stream_id' => $validated['stream_id'],
+                'academic_year' => $validated['academic_year'],
+                'status' => 'active'
             ]);
 
             DB::commit();
@@ -263,11 +335,11 @@ class StudentAssignmentController extends Controller
             Log::debug('StudentAssignmentController: Student assignment updated', [
                 'student_id' => $student->id,
                 'old_class' => $oldClass,
-                'new_class' => $newClass->name
+                'new_class' => "{$class->name} - {$stream->name}"
             ]);
 
             return redirect()->route('admin.student-assignments.index')
-                ->with('success', "Student {$student->name} successfully moved from {$oldClass} to {$newClass->name}!");
+                ->with('success', "Student {$student->name} successfully moved from {$oldClass} to {$class->name} - {$stream->name}!");
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -289,18 +361,25 @@ class StudentAssignmentController extends Controller
     {
         Log::debug('StudentAssignmentController: destroy method called', [
             'student_id' => $student->id,
-            'student_name' => $student->name,
-            'current_class' => $student->class ? $student->class->name : 'No Class'
+            'student_name' => $student->name
         ]);
 
         try {
             DB::beginTransaction();
 
-            $className = $student->class ? $student->class->name : 'No Class';
+            // Get current active assignment
+            $currentAssignment = StudentClassAssignment::where('student_id', $student->id)
+                ->where('status', 'active')
+                ->first();
 
-            $student->update([
-                'class_id' => null
-            ]);
+            if (!$currentAssignment) {
+                throw new \Exception('Student is not currently assigned to any class.');
+            }
+
+            $className = "{$currentAssignment->class->name} - {$currentAssignment->stream->name}";
+
+            // Deactivate the assignment
+            $currentAssignment->update(['status' => 'inactive']);
 
             DB::commit();
 
@@ -346,11 +425,24 @@ class StudentAssignmentController extends Controller
     {
         Log::debug('StudentAssignmentController: getUnassignedStudents method called');
 
-        $students = User::students()
-            ->whereNull('class_id')
-            ->select('id', 'name', 'email', 'student_id')
+        $students = User::whereHas('roles', function($q) {
+            $q->where('name', 'student');
+        })
+            ->whereDoesntHave('studentClassAssignments', function($q) {
+                $q->where('status', 'active');
+            })
+            ->select('id', 'name', 'email')
+            ->with(['profile:user_id,student_id'])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($student) {
+                return [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'email' => $student->email,
+                    'student_id' => $student->profile->student_id ?? 'N/A'
+                ];
+            });
 
         Log::debug('StudentAssignmentController: Unassigned students loaded', [
             'count' => $students->count()
@@ -371,10 +463,22 @@ class StudentAssignmentController extends Controller
             'class_name' => $class->name
         ]);
 
-        $students = $class->students()
-            ->select('id', 'name', 'email', 'student_id')
+        $students = User::whereHas('studentClassAssignments', function($q) use ($class) {
+            $q->where('class_id', $class->id)
+                ->where('status', 'active');
+        })
+            ->select('id', 'name', 'email')
+            ->with(['profile:user_id,student_id'])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($student) {
+                return [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'email' => $student->email,
+                    'student_id' => $student->profile->student_id ?? 'N/A'
+                ];
+            });
 
         Log::debug('StudentAssignmentController: Students by class loaded', [
             'class_id' => $class->id,

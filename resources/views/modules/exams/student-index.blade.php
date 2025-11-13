@@ -18,8 +18,9 @@
                         <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Student Information</h4>
                         <p class="text-sm text-blue-700 dark:text-blue-400 mt-1">
                             <strong>Student:</strong> {{ Auth::user()->name }} |
-                            <strong>Class ID:</strong> {{ Auth::user()->class_id ?? 'NULL' }} |
-                            <strong>Class Name:</strong> {{ Auth::user()->class->name ?? 'Not Assigned' }}
+                            <strong>Class:</strong> {{ $currentAssignment->class->name ?? 'Not Assigned' }} |
+                            <strong>Stream:</strong> {{ $currentAssignment->stream->name ?? 'Not Assigned' }} |
+                            <strong>Academic Year:</strong> {{ $currentAssignment->academic_year ?? 'N/A' }}
                         </p>
                     </div>
                 </div>
@@ -76,7 +77,7 @@
                 </div>
             </div>
 
-            @if(!Auth::user()->class_id)
+            @if(!$currentAssignment)
                 <!-- No Class Assigned -->
                 <div class="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg p-6 text-center">
                     <i class="fas fa-exclamation-triangle text-3xl text-yellow-600 dark:text-yellow-400 mb-4"></i>
@@ -88,15 +89,13 @@
                         <p class="text-sm text-gray-600 dark:text-gray-400">
                             <strong>Current Status:</strong><br>
                             - Student: {{ Auth::user()->name }}<br>
-                            - Class ID: <span class="text-red-500">NULL/Not Set</span><br>
+                            - Class Assignment: <span class="text-red-500">Not Found</span><br>
                             - Email: {{ Auth::user()->email }}
                         </p>
                     </div>
                 </div>
             @elseif($exams->count() > 0)
-                <!-- Filters and Exams Grid (existing code) -->
-                <!-- ... your existing filters and exams grid code ... -->
-
+                <!-- Filters and Exams Grid -->
                 <!-- Filters -->
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
                     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -235,13 +234,13 @@
                     <i class="fas fa-clipboard-list text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Exams Found</h3>
                     <p class="text-gray-500 dark:text-gray-400 mb-4">
-                        There are no exams assigned to your class ({{ Auth::user()->class->name ?? 'Class ID: ' . Auth::user()->class_id }}) at the moment.
+                        There are no exams assigned to your class ({{ $currentAssignment->class->name ?? 'Class Not Found' }}) at the moment.
                     </p>
                     <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
                         <p class="text-sm text-blue-700 dark:text-blue-400">
                             <strong>Debug Information:</strong><br>
-                            - Student Class ID: {{ Auth::user()->class_id }}<br>
-                            - Student Class Name: {{ Auth::user()->class->name ?? 'Not found' }}<br>
+                            - Student Class: {{ $currentAssignment->class->name ?? 'Not found' }}<br>
+                            - Student Stream: {{ $currentAssignment->stream->name ?? 'Not found' }}<br>
                             - Total Exams in System: {{ $stats['total'] }}<br>
                             - Available Exams: {{ $stats['available'] }}
                         </p>

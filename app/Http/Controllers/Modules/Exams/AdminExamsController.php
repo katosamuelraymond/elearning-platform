@@ -183,9 +183,6 @@ class AdminExamsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $this->checkAdmin();
@@ -218,19 +215,34 @@ class AdminExamsController extends Controller
                     'questions' => 'nullable|array',
                 ]);
 
+                // CRITICAL FIX: Convert times from local to UTC and handle timezone issues
+                $startTime = $this->convertToUTC($validated['start_time']);
+                $endTime = $this->convertToUTC($validated['end_time']);
+
+                // DEBUG: Log time conversions
+                Log::info('🕒 TIME CONVERSION DEBUG:', [
+                    'input_start_time' => $validated['start_time'],
+                    'input_end_time' => $validated['end_time'],
+                    'utc_start_time' => $startTime->format('Y-m-d H:i:s'),
+                    'utc_end_time' => $endTime->format('Y-m-d H:i:s'),
+                    'server_now_utc' => now()->format('Y-m-d H:i:s'),
+                    'app_timezone' => config('app.timezone'),
+                    'duration_minutes' => $validated['duration']
+                ]);
+
+                // If exam should start immediately but time is in future due to timezone issues
+                if ($startTime->isFuture() && $this->shouldStartImmediately($validated['start_time'])) {
+                    $startTime = now();
+                    $endTime = now()->addMinutes($validated['duration']);
+                    Log::info('🕒 ADJUSTED TO IMMEDIATE START:', [
+                        'new_start' => $startTime->format('Y-m-d H:i:s'),
+                        'new_end' => $endTime->format('Y-m-d H:i:s')
+                    ]);
+                }
+
                 // 2. Validate that we have at least one question if not draft
                 $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
                 $newQuestions = $validated['questions'] ?? [];
-
-                // DEBUG: Log what we're receiving
-                Log::info('🔍 DEBUG: Store method - Bank questions validation', [
-                    'selected_bank_questions_input' => $validated['selected_bank_questions'] ?? 'empty',
-                    'parsed_bank_questions' => $bankQuestions,
-                    'bank_questions_count' => count($bankQuestions),
-                    'new_questions_count' => count($newQuestions),
-                    'is_draft' => $validated['is_draft'],
-                    'bank_question_points' => $request->input('bank_question_points', [])
-                ]);
 
                 if ($validated['is_draft'] == '0' && empty($bankQuestions) && empty($newQuestions)) {
                     Log::error('Exam creation validation failed: No questions found', [
@@ -249,6 +261,8 @@ class AdminExamsController extends Controller
                     'require_fullscreen' => $request->has('require_fullscreen'),
                     'show_results' => $request->has('show_results'),
                     'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
                 ]);
 
                 // 4. Create Exam
@@ -256,6 +270,18 @@ class AdminExamsController extends Controller
 
                 // 5. Attach questions from bank and create new questions
                 $this->attachQuestionsToExam($exam, $bankQuestions, $newQuestions, $request);
+
+                // Final debug log
+                Log::info('✅ EXAM CREATED SUCCESSFULLY:', [
+                    'exam_id' => $exam->id,
+                    'title' => $exam->title,
+                    'start_time_utc' => $exam->start_time,
+                    'end_time_utc' => $exam->end_time,
+                    'start_time_local' => $exam->start_time->setTimezone('Africa/Nairobi')->format('Y-m-d H:i:s'),
+                    'is_published' => $exam->is_published,
+                    'current_time' => now(),
+                    'time_until_start' => $exam->start_time->diffForHumans(),
+                ]);
 
                 $message = $exam->is_published ? 'Exam created and published successfully!' : 'Exam saved as draft successfully!';
 
@@ -270,6 +296,132 @@ class AdminExamsController extends Controller
                 return redirect()->back()
                     ->withInput()
                     ->with('error', 'Failed to create exam. Please try again.');
+            }
+        });
+    }
+
+    /**
+     * Convert datetime from local time to UTC
+     */
+    private function convertToUTC($dateTimeString)
+    {
+        try {
+            // Assume input is in East Africa Time (UTC+3)
+            $localTimezone = 'Africa/Nairobi';
+
+            // Parse in local timezone first
+            $localTime = \Carbon\Carbon::parse($dateTimeString)->timezone($localTimezone);
+
+            // Convert to UTC
+            $utcTime = $localTime->copy()->setTimezone('UTC');
+
+            Log::info('🕒 TIME CONVERSION:', [
+                'input' => $dateTimeString,
+                'local_time' => $localTime->format('Y-m-d H:i:s'),
+                'utc_time' => $utcTime->format('Y-m-d H:i:s'),
+                'offset' => $localTime->format('P') . ' → UTC'
+            ]);
+
+            return $utcTime;
+
+        } catch (\Exception $e) {
+            Log::error('Time conversion failed:', [
+                'input' => $dateTimeString,
+                'error' => $e->getMessage()
+            ]);
+
+            // Fallback: parse as UTC
+            return \Carbon\Carbon::parse($dateTimeString)->timezone('UTC');
+        }
+    }
+
+    /**
+     * Check if the exam should start immediately based on user intention
+     */
+    private function shouldStartImmediately($inputTime)
+    {
+        // If user sets a time very close to current local time, assume they want immediate start
+        $localTime = \Carbon\Carbon::parse($inputTime)->timezone('Africa/Nairobi');
+        $currentLocalTime = now()->setTimezone('Africa/Nairobi');
+
+        $timeDifference = $localTime->diffInMinutes($currentLocalTime);
+
+        // If within 10 minutes of current local time, assume immediate start intended
+        return $timeDifference <= 10;
+    }
+
+    /**
+     * Create exam that starts immediately (bypass timezone issues)
+     */
+    public function storeInstant(Request $request)
+    {
+        $this->checkAdmin();
+
+        return DB::transaction(function () use ($request) {
+            try {
+                $validated = $request->validate([
+                    'title' => 'required|string|max:255',
+                    'class_id' => 'required|exists:school_classes,id',
+                    'subject_id' => 'required|exists:subjects,id',
+                    'instructions' => 'nullable|string',
+                    'description' => 'nullable|string',
+                    'type' => ['required', Rule::in('quiz', 'midterm', 'end_of_term', 'practice', 'mock')],
+                    'duration' => 'required|integer|min:5', // at least 5 minutes
+                    'total_marks' => 'required|integer|min:1',
+                    'passing_marks' => 'required|integer|min:0',
+                    'max_attempts' => 'required|integer|min:1',
+                    'selected_bank_questions' => 'nullable|string',
+                    'questions' => 'nullable|array',
+                ]);
+
+                // Force immediate start in UTC
+                $startTime = now();
+                $endTime = now()->addMinutes($validated['duration']);
+
+                // Validate questions
+                $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
+                $newQuestions = $validated['questions'] ?? [];
+
+                if (empty($bankQuestions) && empty($newQuestions)) {
+                    throw ValidationException::withMessages([
+                        'questions' => 'At least one question is required for exams.'
+                    ]);
+                }
+
+                // Create exam data
+                $examData = array_merge($validated, [
+                    'teacher_id' => Auth::id(),
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'is_published' => true,
+                    'randomize_questions' => $request->has('randomize_questions'),
+                    'require_fullscreen' => $request->has('require_fullscreen'),
+                    'show_results' => $request->has('show_results'),
+                ]);
+
+                $exam = Exam::create($examData);
+
+                // Attach questions
+                $this->attachQuestionsToExam($exam, $bankQuestions, $newQuestions, $request);
+
+                Log::info('🚀 INSTANT EXAM CREATED:', [
+                    'exam_id' => $exam->id,
+                    'start_time' => $exam->start_time,
+                    'end_time' => $exam->end_time,
+                    'current_time' => now(),
+                ]);
+
+                return redirect()->route('admin.exams.index')
+                    ->with('success', 'Instant exam created and started successfully!');
+
+            } catch (ValidationException $e) {
+                Log::error('Instant exam validation failed:', ['errors' => $e->errors()]);
+                throw $e;
+            } catch (\Exception $e) {
+                Log::error('Instant exam creation failed:', ['error' => $e->getMessage()]);
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Failed to create instant exam. Please try again.');
             }
         });
     }
@@ -369,6 +521,7 @@ class AdminExamsController extends Controller
         // You might want to update the exam's total_marks based on actual points
         // $exam->update(['total_marks' => $totalPoints]);
     }
+
     /**
      * Validate and save new questions
      */
@@ -598,6 +751,10 @@ class AdminExamsController extends Controller
                     'custom_questions' => 'nullable|array',
                 ]);
 
+                // CRITICAL FIX: Convert times from local to UTC for update as well
+                $startTime = $this->convertToUTC($validated['start_time']);
+                $endTime = $this->convertToUTC($validated['end_time']);
+
                 // 2. Validate that we have at least one question if not draft
                 $bankQuestions = $this->parseBankQuestions($validated['selected_bank_questions'] ?? '');
                 $customQuestions = $validated['custom_questions'] ?? [];
@@ -628,6 +785,8 @@ class AdminExamsController extends Controller
                     'require_fullscreen' => $request->has('require_fullscreen'),
                     'show_results' => $request->has('show_results'),
                     'is_published' => $request->input('is_draft') == '1' ? false : $request->has('is_published'),
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
                 ]);
 
                 // 4. Update Exam
@@ -664,134 +823,6 @@ class AdminExamsController extends Controller
         });
     }
 
-
-    /**
-     * Validate and save custom questions
-     */
-    private function validateAndSaveCustomQuestions(Exam $exam, array $questionsData)
-    {
-        Log::info('Custom questions data received:', ['questions' => $questionsData]);
-
-        // Define validation rules for each question item
-        $rules = [];
-
-        foreach ($questionsData as $index => $question) {
-            $questionType = $question['type'] ?? null;
-
-            // Base rules for all questions
-            $rules["{$index}.type"] = ['required', Rule::in(['mcq', 'true_false', 'short_answer', 'essay', 'fill_blank'])];
-            $rules["{$index}.points"] = ['required', 'numeric', 'min:0.5', 'max:100'];
-            $rules["{$index}.question_text"] = ['required', 'string'];
-
-            // Type-specific rules
-            switch ($questionType) {
-                case 'mcq':
-                    $rules["{$index}.correct_answer"] = ['required', 'integer', 'min:0'];
-                    $rules["{$index}.options"] = ['required', 'array', 'min:2', 'max:6'];
-                    $rules["{$index}.options.*"] = ['required', 'string', 'max:500'];
-                    break;
-
-                case 'true_false':
-                    $rules["{$index}.correct_answer"] = ['required', Rule::in(['true', 'false'])];
-                    break;
-
-                case 'short_answer':
-                    $rules["{$index}.expected_answer"] = ['nullable', 'string'];
-                    break;
-
-                case 'essay':
-                    $rules["{$index}.grading_rubric"] = ['nullable', 'string'];
-                    break;
-
-                case 'fill_blank':
-                    $rules["{$index}.blank_question"] = ['required', 'string'];
-                    $rules["{$index}.blank_answers"] = ['required', 'string'];
-                    break;
-            }
-        }
-
-        // Validate the questions array
-        $validator = Validator::make($questionsData, $rules);
-
-        if ($validator->fails()) {
-            Log::error('Custom question validation failed:', ['errors' => $validator->errors()->toArray()]);
-            throw new ValidationException($validator);
-        }
-
-        $validatedQuestions = $validator->validated();
-        $savedQuestions = [];
-
-        // Save questions
-        foreach ($validatedQuestions as $index => $qData) {
-            $details = [];
-            $correctAnswer = null;
-
-            // Prepare question data based on type
-            switch ($qData['type']) {
-                case 'mcq':
-                    $correctAnswer = $qData['correct_answer'];
-                    break;
-                case 'true_false':
-                    $correctAnswer = $qData['correct_answer'];
-                    break;
-                case 'short_answer':
-                    $details['expected_answer'] = $qData['expected_answer'] ?? null;
-                    $correctAnswer = $details['expected_answer'];
-                    break;
-                case 'essay':
-                    $details['grading_rubric'] = $qData['grading_rubric'] ?? null;
-                    break;
-                case 'fill_blank':
-                    $details['blank_question'] = $qData['blank_question'];
-                    $blankAnswers = array_map('trim', explode(',', $qData['blank_answers'] ?? ''));
-                    $details['blank_answers'] = $blankAnswers;
-                    $correctAnswer = json_encode($blankAnswers);
-                    break;
-            }
-
-            // Create the base Question record
-            $questionData = [
-                'subject_id' => $exam->subject_id,
-                'created_by' => Auth::id(),
-                'type' => $qData['type'],
-                'points' => $qData['points'],
-                'question_text' => $qData['question_text'],
-                'details' => !empty($details) ? $details : null,
-                'correct_answer' => $correctAnswer,
-                'is_active' => true,
-                'is_bank_question' => false, // Custom questions are not added to bank by default
-            ];
-
-            $question = Question::create($questionData);
-
-            // Attach to exam
-            $exam->questions()->attach($question->id, [
-                'order' => $exam->questions()->count(),
-                'points' => $qData['points']
-            ]);
-
-            // Handle Multiple Choice Options
-            if ($qData['type'] === 'mcq' && !empty($qData['options'])) {
-                foreach ($qData['options'] as $optIndex => $optionText) {
-                    QuestionOption::create([
-                        'question_id' => $question->id,
-                        'option_text' => $optionText,
-                        'is_correct' => ($optIndex == $qData['correct_answer']),
-                        'order' => $optIndex,
-                    ]);
-                }
-            }
-
-            $savedQuestions[] = $qData;
-        }
-
-        Log::info('All custom questions saved successfully for exam:', [
-            'exam_id' => $exam->id,
-            'questions_count' => count($validatedQuestions)
-        ]);
-
-        return $savedQuestions;
-    }
     /**
      * Remove the specified resource from storage.
      */
@@ -871,6 +902,7 @@ class AdminExamsController extends Controller
             'showFooter' => true
         ]);
     }
+
     /**
      * Display exam for printing
      */
@@ -957,5 +989,38 @@ class AdminExamsController extends Controller
             ->with('success', "Exam {$status} successfully!");
     }
 
+    /**
+     * Fix exam times for existing exams (utility method)
+     */
+    public function fixExamTimes(Exam $exam)
+    {
+        $this->checkAdmin();
 
+        try {
+            $originalStart = $exam->start_time;
+            $originalEnd = $exam->end_time;
+
+            // Adjust times by subtracting 3 hours (UTC+3 to UTC conversion)
+            $exam->update([
+                'start_time' => $exam->start_time->subHours(3),
+                'end_time' => $exam->end_time->subHours(3),
+            ]);
+
+            Log::info('🕒 EXAM TIMES FIXED:', [
+                'exam_id' => $exam->id,
+                'original_start' => $originalStart,
+                'fixed_start' => $exam->start_time,
+                'original_end' => $originalEnd,
+                'fixed_end' => $exam->end_time,
+            ]);
+
+            return redirect()->back()
+                ->with('success', 'Exam times fixed successfully!');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to fix exam times:', ['error' => $e->getMessage()]);
+            return redirect()->back()
+                ->with('error', 'Failed to fix exam times.');
+        }
+    }
 }

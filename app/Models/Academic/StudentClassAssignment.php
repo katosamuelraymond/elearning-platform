@@ -4,9 +4,6 @@ namespace App\Models\Academic;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Academic\SchoolClass;
-use App\Models\Academic\Stream;
-use App\Models\User;
 
 class StudentClassAssignment extends Model
 {
@@ -16,40 +13,58 @@ class StudentClassAssignment extends Model
         'stream_id',
         'academic_year',
         'optional_subjects',
-        'status'
+        'status',
+        'combination_id'
     ];
 
     protected $casts = [
         'optional_subjects' => 'array'
     ];
 
-    public function student(): BelongsTo
+    /**
+     * Get the student for this assignment.
+     */
+    public function student()
     {
-        return $this->belongsTo(User::class, 'student_id');
+        return $this->belongsTo(\App\Models\User::class, 'student_id');
     }
 
-    public function class(): BelongsTo
+    /**
+     * Get the class for this assignment.
+     */
+    public function class()
     {
         return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
-    public function stream(): BelongsTo
+    /**
+     * Get the stream for this assignment.
+     */
+    public function stream()
     {
         return $this->belongsTo(Stream::class, 'stream_id');
     }
 
-    // Query Scopes
+    /**
+     * Get the combination for this assignment.
+     */
+    public function combination()
+    {
+        return $this->belongsTo(Combination::class, 'combination_id');
+    }
+
+    /**
+     * Scope for active assignments.
+     */
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
 
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'completed');
-    }
-
-    public function scopeForAcademicYear($query, $year)
+    /**
+     * Scope for assignments by academic year.
+     */
+    public function scopeByAcademicYear($query, $year)
     {
         return $query->where('academic_year', $year);
     }

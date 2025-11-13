@@ -125,6 +125,7 @@ class Exam extends Model
 
         return "{$minutes}m";
     }
+
     // Scopes
     public function scopeAvailableForStudent($query, $student)
     {
@@ -152,7 +153,7 @@ class Exam extends Model
         });
     }
 
-// Helper methods
+    // Helper methods
     public function getStatusForStudent($student)
     {
         if ($this->attempts()->where('student_id', $student->id)->where('status', 'in_progress')->exists()) {
@@ -195,7 +196,6 @@ class Exam extends Model
         return true;
     }
 
-
     public function getStatusTextForStudent($student)
     {
         $status = $this->getStatusForStudent($student);
@@ -226,9 +226,19 @@ class Exam extends Model
         return $badgeClasses[$status] ?? 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200';
     }
 
+    // FIXED: Check if exam is assigned to student through class assignment
     public function isAssignedToStudent($student)
     {
-        return $this->class_id === $student->class_id && $this->is_published && !$this->is_archived;
+        // Get student's current class assignment
+        $currentAssignment = $student->currentClassAssignment;
+
+        if (!$currentAssignment) {
+            return false;
+        }
+
+        return $this->class_id === $currentAssignment->class_id &&
+            $this->is_published &&
+            !$this->is_archived;
     }
 
     public function isNextAttemptAvailable($student)

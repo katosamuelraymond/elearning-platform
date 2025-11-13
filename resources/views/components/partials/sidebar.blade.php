@@ -230,17 +230,39 @@
                             class="ajax-link"
                         />
 
-                        <!-- ADD TEACHER ASSIGNMENTS SECTION -->
-                        <x-partials.sidebar-collapsible label="Classes" icon="fas fa-chalkboard-teacher text-indigo-500 dark:text-indigo-400">
+                        <!-- ADDED: STUDENT ASSIGNMENTS SECTION -->
+                        <x-partials.sidebar-collapsible label="Student Management" icon="fas fa-user-graduate text-cyan-500 dark:text-cyan-400">
                             <x-partials.sidebar-link
-                                href="{{ route('admin.teacher-assignments.index') }}"
-                                label="Assign"
-                                icon="fas fa-user-check text-indigo-400 dark:text-indigo-300 text-xs"
+                                href="{{ route('admin.student-assignments.index') }}"
+                                label="Class Assignments"
+                                icon="fas fa-user-check text-cyan-400 dark:text-cyan-300 text-xs"
+                                class="ajax-link"
+                            />
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.student-assignments.create') }}"
+                                label="Assign Student"
+                                icon="fas fa-user-plus text-cyan-300 dark:text-cyan-200 text-xs"
                                 class="ajax-link"
                             />
                         </x-partials.sidebar-collapsible>
 
-                        <!-- ADD QUESTION BANK SECTION -->
+                        <!-- TEACHER ASSIGNMENTS SECTION -->
+                        <x-partials.sidebar-collapsible label="Teacher Management" icon="fas fa-chalkboard-teacher text-indigo-500 dark:text-indigo-400">
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.teacher-assignments.index') }}"
+                                label="Class Assignments"
+                                icon="fas fa-user-check text-indigo-400 dark:text-indigo-300 text-xs"
+                                class="ajax-link"
+                            />
+                            <x-partials.sidebar-link
+                                href="{{ route('admin.teacher-assignments.create') }}"
+                                label="Assign Teacher"
+                                icon="fas fa-user-plus text-indigo-300 dark:text-indigo-200 text-xs"
+                                class="ajax-link"
+                            />
+                        </x-partials.sidebar-collapsible>
+
+                        <!-- QUESTION BANK SECTION -->
                         <x-partials.sidebar-collapsible label="Question Bank" icon="fas fa-question-circle text-purple-500 dark:text-purple-400">
                             <x-partials.sidebar-link
                                 href="{{ route('admin.questions.index') }}"
