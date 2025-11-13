@@ -11,7 +11,7 @@ export default defineConfig({
       ],
       refresh: true,
     }),
-    tailwindcss(),
+    // tailwindcss(),
   ],
   resolve: {
     alias: {
