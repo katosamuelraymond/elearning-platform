@@ -1,655 +1,646 @@
 @extends('layouts.app')
 
-@section('title', 'Take Exam - ' . $exam->title)
+@section('title', 'Taking Exam - ' . $exam->title)
 
 @section('content')
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
-            <div class="mb-8">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ $exam->title }}</h1>
-                        <p class="text-gray-600 dark:text-gray-300 mt-2">{{ $exam->description }}</p>
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <!-- Header with Timer Only -->
+        <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-3">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-lg font-bold text-gray-900 dark:text-white">{{ $exam->title }}</h1>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">•</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ $exam->subject->name }}</span>
                     </div>
-                    <div class="text-right">
-                        <!-- Timer Display -->
-                        <div id="timer-container" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 min-w-48">
-                            <div id="countdown-timer" class="hidden">
-                                <p class="text-sm text-gray-600 dark:text-gray-400">Exam starts in:</p>
-                                <div id="countdown-display" class="text-2xl font-bold text-blue-600 dark:text-blue-400"></div>
+
+                    <!-- Timer -->
+                    <div id="timer-container" class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time Remaining</div>
+                            <div id="exam-timer-display" class="text-xl font-mono font-bold text-green-600 dark:text-green-400">
+                                00:00:00
                             </div>
-                            <div id="exam-timer" class="hidden">
-                                <p class="text-sm text-gray-600 dark:text-gray-400">Time remaining:</p>
-                                <div id="exam-timer-display" class="text-2xl font-bold text-red-600 dark:text-red-400"></div>
-                            </div>
-                            <div id="exam-completed" class="hidden">
-                                <p class="text-sm text-green-600 dark:text-green-400 font-semibold">Exam Completed</p>
+                            <div id="timer-status" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Based on exam schedule
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Exam Info Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <i class="fas fa-clock text-blue-600 dark:text-blue-400 mr-3"></i>
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Duration</p>
-                            <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $exam->duration }} minutes</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <i class="fas fa-file-alt text-green-600 dark:text-green-400 mr-3"></i>
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Questions</p>
-                            <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $exam->questions->count() }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <i class="fas fa-star text-yellow-600 dark:text-yellow-400 mr-3"></i>
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Marks</p>
-                            <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $exam->total_marks }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <div class="flex items-center">
-                        <i class="fas fa-book text-purple-600 dark:text-purple-400 mr-3"></i>
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Subject</p>
-                            <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $exam->subject->name }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Exam Instructions -->
-            <div id="exam-instructions" class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-8">
-                <h3 class="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">Exam Instructions</h3>
-                <ul class="space-y-2 text-blue-700 dark:text-blue-400">
-                    <li class="flex items-start">
-                        <i class="fas fa-info-circle mt-1 mr-2"></i>
-                        <span>You have <strong>{{ $exam->duration }} minutes</strong> to complete this exam</span>
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-save mt-1 mr-2"></i>
-                        <span>Answers are saved automatically as you progress</span>
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-clock mt-1 mr-2"></i>
-                        <span>The exam will automatically submit when time expires</span>
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-ban mt-1 mr-2"></i>
-                        <span>Do not refresh the page or navigate away during the exam</span>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Exam Content (Hidden until start) -->
-            <div id="exam-content" class="hidden">
-                <form id="exam-form" action="{{ route('student.exams.submit', $exam) }}" method="POST">
+        <!-- Questions Container -->
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            @if($attempt->status === 'in_progress')
+                <form id="exam-form" action="{{ route('student.exams.submit', ['exam' => $exam, 'attempt' => $attempt]) }}" method="POST">
                     @csrf
-                    <input type="hidden" name="attempt_id" value="{{ $attempt->id }}">
-
-                    <!-- Progress Bar -->
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
-                            <span id="progress-text" class="text-sm font-medium text-gray-700 dark:text-gray-300">0/{{ $exam->questions->count() }}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div id="progress-bar" class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                    </div>
 
                     <!-- Questions -->
                     <div class="space-y-6">
                         @foreach($exam->questions as $index => $question)
-                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 question-container" data-question-id="{{ $question->id }}">
-                                <div class="flex justify-between items-start mb-4">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 question-container" data-question-id="{{ $question->id }}">
+                                <!-- Question Header -->
+                                <div class="flex items-start justify-between mb-4">
                                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                                         Question {{ $index + 1 }}
-                                        <span class="text-sm text-gray-500 dark:text-gray-400">({{ $question->marks }} marks)</span>
                                     </h3>
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300">
-                                    {{ ucfirst($question->type) }}
-                                </span>
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                                        {{ $question->pivot->points ?? $question->points }} point{{ ($question->pivot->points ?? $question->points) > 1 ? 's' : '' }}
+                                    </span>
                                 </div>
 
-                                <div class="mb-4">
-                                    <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{!! $question->content !!}</p>
+                                <!-- Question Text -->
+                                <div class="mb-6">
+                                    <p class="text-gray-700 dark:text-gray-300 text-lg leading-relaxed whitespace-pre-wrap">
+                                        {{ $question->question_text }}
+                                    </p>
                                 </div>
 
                                 <!-- Answer Input -->
                                 <div class="answer-container">
-                                    @if($question->type === 'multiple_choice')
-                                        <div class="space-y-2">
-                                            @foreach($question->options as $optionKey => $optionValue)
-                                                <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                                                    <input type="radio" name="answers[{{ $question->id }}]" value="{{ $optionKey }}"
-                                                           class="question-answer mr-3" data-question-id="{{ $question->id }}">
-                                                    <span class="text-gray-700 dark:text-gray-300">{{ $optionValue }}</span>
+                                    @if($question->type === 'mcq')
+                                        <div class="space-y-3">
+                                            @foreach($question->options as $optionIndex => $option)
+                                                <label class="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150">
+                                                    <input type="radio"
+                                                           name="answers[{{ $question->id }}]"
+                                                           value="{{ $option->id }}"
+
+                                                           class="question-answer mr-4 h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                                           data-question-id="{{ $question->id }}"
+                                                        {{ isset($savedAnswers[$question->id]) && $savedAnswers[$question->id] == $optionIndex ? 'checked' : '' }}>
+                                                    <span class="text-gray-700 dark:text-gray-300">
+                                                        <span class="font-medium">{{ chr(65 + $optionIndex) }}.</span>
+                                                        {{ $option->option_text }}
+                                                    </span>
                                                 </label>
                                             @endforeach
                                         </div>
                                     @elseif($question->type === 'true_false')
-                                        <div class="space-y-2">
-                                            <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                                                <input type="radio" name="answers[{{ $question->id }}]" value="true"
-                                                       class="question-answer mr-3" data-question-id="{{ $question->id }}">
-                                                <span class="text-gray-700 dark:text-gray-300">True</span>
+                                        <div class="flex space-x-4">
+                                            <label class="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150 flex-1">
+                                                <input type="radio"
+                                                       name="answers[{{ $question->id }}]"
+                                                       value="true"
+                                                       class="question-answer mr-4 h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                                       data-question-id="{{ $question->id }}"
+                                                    {{ isset($savedAnswers[$question->id]) && $savedAnswers[$question->id] == 'true' ? 'checked' : '' }}>
+                                                <span class="text-gray-700 dark:text-gray-300 font-medium">True</span>
                                             </label>
-                                            <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                                                <input type="radio" name="answers[{{ $question->id }}]" value="false"
-                                                       class="question-answer mr-3" data-question-id="{{ $question->id }}">
-                                                <span class="text-gray-700 dark:text-gray-300">False</span>
+                                            <label class="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150 flex-1">
+                                                <input type="radio"
+                                                       name="answers[{{ $question->id }}]"
+                                                       value="false"
+                                                       class="question-answer mr-4 h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                                       data-question-id="{{ $question->id }}"
+                                                    {{ isset($savedAnswers[$question->id]) && $savedAnswers[$question->id] == 'false' ? 'checked' : '' }}>
+                                                <span class="text-gray-700 dark:text-gray-300 font-medium">False</span>
                                             </label>
                                         </div>
-                                    @else
+                                    @elseif($question->type === 'short_answer')
                                         <textarea name="answers[{{ $question->id }}]"
-                                                  class="question-answer w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                  rows="4"
+                                                  class="question-answer w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-none"
+                                                  rows="3"
                                                   placeholder="Type your answer here..."
-                                                  data-question-id="{{ $question->id }}"></textarea>
+                                                  data-question-id="{{ $question->id }}">{{ $savedAnswers[$question->id] ?? '' }}</textarea>
+                                    @elseif($question->type === 'essay')
+                                        <textarea name="answers[{{ $question->id }}]"
+                                                  class="question-answer w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-none"
+                                                  rows="6"
+                                                  placeholder="Write your essay answer here..."
+                                                  data-question-id="{{ $question->id }}">{{ $savedAnswers[$question->id] ?? '' }}</textarea>
+                                    @elseif($question->type === 'fill_blank')
+                                        @php
+                                            $parts = explode('[blank]', $question->question_text);
+                                        @endphp
+                                        <div class="space-y-3">
+                                            <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                                @foreach($parts as $partIndex => $part)
+                                                    {{ $part }}
+                                                    @if($partIndex < count($parts) - 1)
+                                                        <input type="text"
+                                                               name="answers[{{ $question->id }}][]"
+                                                               class="question-answer inline-block w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white mx-1"
+                                                               placeholder="_____"
+                                                               value="{{ $savedAnswers[$question->id][$partIndex] ?? '' }}"
+                                                               data-question-id="{{ $question->id }}"
+                                                               data-blank-index="{{ $partIndex }}">
+                                                    @endif
+                                                @endforeach
+                                            </p>
+                                        </div>
                                     @endif
                                 </div>
 
-                                <!-- Answer Status -->
+                                <!-- Auto-save Status -->
                                 <div class="mt-3">
-                                <span class="answer-status text-sm text-gray-500 dark:text-gray-400 hidden">
-                                    <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                                    <span>Saved</span>
-                                </span>
+                                    <span class="answer-status text-sm text-green-600 dark:text-green-400 hidden">
+                                        <i class="fas fa-check mr-1"></i>Saved
+                                    </span>
                                 </div>
                             </div>
                         @endforeach
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg">
-                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div class="flex justify-between items-center">
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <span id="saved-count">0</span> of {{ $exam->questions->count() }} answers saved
-                                </div>
-                                <div class="flex space-x-3">
-                                    <button type="button" id="save-progress-btn"
-                                            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200">
-                                        Save Progress
-                                    </button>
-                                    <button type="button" id="submit-exam-btn"
-                                            class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200">
-                                        Submit Exam
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Submit Button -->
+                    <div class="fixed bottom-6 right-6">
+                        <button type="button" id="submit-exam-btn"
+                                class="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg font-semibold transition-all duration-200 hover:scale-105 flex items-center space-x-2">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Submit Exam</span>
+                        </button>
                     </div>
                 </form>
-            </div>
-
-            <!-- Start Exam Button -->
-            <div id="start-exam-container" class="text-center py-8">
-                <button id="start-exam-btn"
-                        class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Start Exam
-                </button>
-                <p class="text-gray-500 dark:text-gray-400 mt-4" id="start-exam-message"></p>
-            </div>
+            @else
+                <!-- Completed Exam Message -->
+                <div class="text-center py-16">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 max-w-md mx-auto">
+                        <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Exam Completed</h2>
+                        <p class="text-gray-600 dark:text-gray-400 mb-6">This exam has already been submitted.</p>
+                        <a href="{{ route('student.exams.results', ['exam' => $exam, 'attempt' => $attempt]) }}"
+                           class="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200">
+                            View Results
+                        </a>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 
     <!-- Confirmation Modal -->
     <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Submit Exam</h3>
-            <p class="text-gray-600 dark:text-gray-300 mb-6">Are you sure you want to submit your exam? This action cannot be undone.</p>
-            <div class="flex justify-end space-x-3">
-                <button type="button" id="cancel-submit"
-                        class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium">
-                    Cancel
-                </button>
-                <button type="button" id="confirm-submit"
-                        class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
-                    Submit Exam
-                </button>
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-yellow-500 text-4xl mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Submit Exam?</h3>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to submit? You cannot return after submitting.</p>
+
+                <div class="flex justify-center space-x-3">
+                    <button type="button" id="cancel-submit"
+                            class="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors duration-200">
+                        Cancel
+                    </button>
+                    <button type="button" id="confirm-submit"
+                            class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200">
+                        Submit Now
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Debug Information (Remove in production) -->
+    @if(config('app.debug'))
+        <div class="fixed bottom-0 left-0 bg-black bg-opacity-80 text-white p-4 text-xs max-w-md z-50">
+            <div class="font-bold mb-2">Debug Info:</div>
+            <div>Exam: {{ $exam->title }}</div>
+            <div>Attempt: {{ $attempt->id }}</div>
+            <div>Status: {{ $attempt->status }}</div>
+            <div>Saved Answers: <span id="debug-answer-count">0</span></div>
+            <div>Time Remaining: <span id="debug-time-remaining">0</span>s</div>
+            <div>Last Save: <span id="debug-last-save">Never</span></div>
+        </div>
+    @endif
 @endsection
 
-@section('scripts')
-    <script>
-        class ExamTimer {
-            constructor(examStartTime, examDuration, attemptId) {
-                this.examStartTime = new Date(examStartTime).getTime();
-                this.examDuration = examDuration * 60 * 1000; // Convert to milliseconds
-                this.attemptId = attemptId;
-                this.examStarted = false;
-                this.examEnded = false;
-                this.interval = null;
+<script>
+    class ExamManager {
+        constructor(examId, attemptId, timeData) {
+            this.examId = examId;
+            this.attemptId = attemptId;
+            this.timeData = timeData;
+            this.savedAnswers = {};
+            this.isSubmitting = false;
+            this.lastSaveTime = null;
 
-                this.init();
-            }
+            // Calculate initial time remaining from server data
+            this.examEndTime = new Date(timeData.end_time).getTime();
+            this.timeRemaining = this.calculateTimeRemaining();
 
-            init() {
-                const now = Date.now();
-                const timeUntilStart = this.examStartTime - now;
+            console.log('⏰ Timer initialized:', {
+                examEndTime: new Date(this.examEndTime).toLocaleString(),
+                initialTimeRemaining: this.timeRemaining,
+                examDuration: timeData.duration_minutes + ' minutes'
+            });
 
-                if (timeUntilStart > 0) {
-                    // Exam hasn't started yet
-                    this.showCountdownTimer();
-                    this.startCountdown();
-                } else {
-                    // Exam has started or should start
-                    const elapsedTime = now - this.examStartTime;
-                    const remainingTime = this.examDuration - elapsedTime;
+            this.init();
+        }
 
-                    if (remainingTime > 0) {
-                        this.startExamTimer(remainingTime);
-                    } else {
-                        this.handleTimeUp();
-                    }
+        calculateTimeRemaining() {
+            const now = Date.now();
+            const remaining = Math.floor((this.examEndTime - now) / 1000);
+            return Math.max(0, remaining);
+        }
+
+        init() {
+            this.loadSavedProgress().then(() => {
+                this.bindEvents();
+                this.startTimer();
+                this.updateDebugInfo();
+            });
+        }
+
+        bindEvents() {
+            // Auto-save on answer change
+            document.addEventListener('change', (e) => {
+                if (e.target.classList.contains('question-answer')) {
+                    this.handleAnswerChange(e.target);
                 }
-            }
+            });
 
-            showCountdownTimer() {
-                document.getElementById('countdown-timer').classList.remove('hidden');
-                document.getElementById('exam-instructions').classList.remove('hidden');
-                document.getElementById('start-exam-container').classList.add('hidden');
-                document.getElementById('start-exam-btn').disabled = true;
-
-                const message = document.getElementById('start-exam-message');
-                message.textContent = 'Please wait for the exam to start...';
-                message.classList.add('text-yellow-600', 'dark:text-yellow-400');
-            }
-
-            showExamTimer() {
-                document.getElementById('countdown-timer').classList.add('hidden');
-                document.getElementById('exam-timer').classList.remove('hidden');
-                document.getElementById('exam-instructions').classList.add('hidden');
-                document.getElementById('exam-content').classList.remove('hidden');
-                document.getElementById('start-exam-container').classList.add('hidden');
-            }
-
-            startCountdown() {
-                this.interval = setInterval(() => {
-                    const now = Date.now();
-                    const timeUntilStart = this.examStartTime - now;
-
-                    if (timeUntilStart <= 0) {
-                        clearInterval(this.interval);
-                        this.startExamTimer(this.examDuration);
-                        return;
-                    }
-
-                    this.updateCountdownDisplay(timeUntilStart);
-                }, 1000);
-            }
-
-            updateCountdownDisplay(milliseconds) {
-                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
-
-                const display = document.getElementById('countdown-display');
-                display.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-
-            startExamTimer(remainingTime) {
-                this.examStarted = true;
-                this.showExamTimer();
-
-                // Enable start button if we're in the exam window
-                document.getElementById('start-exam-btn').disabled = false;
-                document.getElementById('start-exam-message').textContent = 'Click "Start Exam" to begin';
-
-                // Start the exam timer
-                this.interval = setInterval(() => {
-                    remainingTime -= 1000;
-
-                    if (remainingTime <= 0) {
-                        this.handleTimeUp();
-                        return;
-                    }
-
-                    this.updateExamTimerDisplay(remainingTime);
-
-                    // Auto-save every 30 seconds
-                    if (Math.floor(remainingTime / 1000) % 30 === 0) {
-                        this.autoSaveProgress();
-                    }
-
-                    // Warning when 5 minutes remaining
-                    if (remainingTime === 5 * 60 * 1000) {
-                        this.showTimeWarning();
-                    }
-                }, 1000);
-            }
-
-            updateExamTimerDisplay(milliseconds) {
-                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
-
-                const display = document.getElementById('exam-timer-display');
-                display.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-                // Change color when time is running out
-                if (milliseconds < 5 * 60 * 1000) { // Less than 5 minutes
-                    display.classList.remove('text-red-600', 'dark:text-red-400');
-                    display.classList.add('text-orange-500', 'dark:text-orange-400');
+            document.addEventListener('input', (e) => {
+                if (e.target.classList.contains('question-answer')) {
+                    this.handleAnswerChange(e.target);
                 }
-            }
+            });
 
-            showTimeWarning() {
-                // Create and show a warning notification
-                const warning = document.createElement('div');
-                warning.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50';
-                warning.innerHTML = `
-            <div class="flex items-center">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
-                <span>Only 5 minutes remaining!</span>
-            </div>
-        `;
-                document.body.appendChild(warning);
+            // Submit exam
+            document.getElementById('submit-exam-btn').addEventListener('click', () => {
+                this.showConfirmationModal();
+            });
 
-                setTimeout(() => {
-                    warning.remove();
-                }, 5000);
-            }
+            document.getElementById('confirm-submit').addEventListener('click', () => {
+                this.submitExam();
+            });
 
-            async autoSaveProgress() {
-                if (!this.examStarted || this.examEnded) return;
+            document.getElementById('cancel-submit').addEventListener('click', () => {
+                this.hideConfirmationModal();
+            });
 
-                try {
-                    await window.examManager.saveProgress();
-                } catch (error) {
-                    console.error('Auto-save failed:', error);
+            // Warn before leaving
+            window.addEventListener('beforeunload', (e) => {
+                if (!this.isSubmitting && Object.keys(this.savedAnswers).length > 0) {
+                    e.preventDefault();
+                    e.returnValue = 'Your answers may not be saved. Are you sure you want to leave?';
+                    return e.returnValue;
                 }
-            }
+            });
 
-            handleTimeUp() {
-                clearInterval(this.interval);
-                this.examEnded = true;
-
-                document.getElementById('exam-timer').classList.add('hidden');
-                document.getElementById('exam-completed').classList.remove('hidden');
-
-                // Auto-submit the exam
-                this.autoSubmitExam();
-            }
-
-            async autoSubmitExam() {
-                try {
-                    // Save final progress
-                    await window.examManager.saveProgress();
-
-                    // Submit the exam
-                    document.getElementById('exam-form').submit();
-                } catch (error) {
-                    console.error('Auto-submit failed:', error);
-                    // Force submit even if save fails
-                    document.getElementById('exam-form').submit();
+            // Handle page hide event (for mobile/tab switching)
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('📱 Tab inactive, auto-saving...');
+                    this.saveProgress();
                 }
-            }
+            });
+        }
 
-            stop() {
-                if (this.interval) {
-                    clearInterval(this.interval);
+        startTimer() {
+            this.updateTimerDisplay();
+
+            this.timerInterval = setInterval(() => {
+                this.timeRemaining = this.calculateTimeRemaining();
+
+                if (this.timeRemaining <= 0) {
+                    this.handleTimeUp();
+                    return;
                 }
+
+                this.updateTimerDisplay();
+                this.updateDebugInfo();
+
+                // Auto-save every 2 minutes
+                if (this.timeRemaining % 120 === 0) {
+                    this.saveProgress();
+                }
+
+                // Visual warnings
+                if (this.timeRemaining === 300) { // 5 minutes
+                    this.showTimeWarning('5 minutes remaining!');
+                }
+                if (this.timeRemaining === 60) { // 1 minute
+                    this.showTimeWarning('1 minute remaining!');
+                    this.startBlinkingTimer();
+                }
+
+                // Update timer status every 30 seconds for debugging
+                if (this.timeRemaining % 30 === 0) {
+                    this.updateTimerStatus();
+                }
+            }, 1000);
+        }
+
+        updateTimerDisplay() {
+            const hours = Math.floor(this.timeRemaining / 3600);
+            const minutes = Math.floor((this.timeRemaining % 3600) / 60);
+            const seconds = this.timeRemaining % 60;
+
+            const display = document.getElementById('exam-timer-display');
+            display.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            // Color changes based on time
+            if (this.timeRemaining > 300) { // More than 5 minutes
+                display.className = 'text-xl font-mono font-bold text-green-600 dark:text-green-400';
+            } else if (this.timeRemaining > 60) { // 1-5 minutes
+                display.className = 'text-xl font-mono font-bold text-orange-500 dark:text-orange-400';
+            } else { // Less than 1 minute
+                display.className = 'text-xl font-mono font-bold text-red-600 dark:text-red-400 animate-pulse';
             }
         }
 
-        class ExamManager {
-            constructor(examId, attemptId) {
-                this.examId = examId;
-                this.attemptId = attemptId;
-                this.savedAnswers = new Set();
-                this.isSubmitting = false;
-
-                this.init();
+        updateTimerStatus() {
+            const statusElement = document.getElementById('timer-status');
+            if (statusElement) {
+                const endTime = new Date(this.examEndTime).toLocaleTimeString();
+                statusElement.textContent = `Exam ends at ${endTime}`;
             }
+        }
 
-            init() {
-                this.bindEvents();
-                this.loadSavedProgress();
-            }
+        startBlinkingTimer() {
+            const display = document.getElementById('exam-timer-display');
+            const blinkInterval = setInterval(() => {
+                display.classList.toggle('opacity-50');
+            }, 500);
 
-            bindEvents() {
-                // Start exam button
-                document.getElementById('start-exam-btn').addEventListener('click', () => {
-                    this.startExam();
-                });
+            // Stop blinking when time is up
+            setTimeout(() => {
+                clearInterval(blinkInterval);
+                display.classList.remove('opacity-50');
+            }, 60000);
+        }
 
-                // Answer change events
-                document.querySelectorAll('.question-answer').forEach(element => {
-                    if (element.type === 'radio' || element.type === 'checkbox') {
-                        element.addEventListener('change', (e) => this.handleAnswerChange(e.target));
-                    } else {
-                        element.addEventListener('input', (e) => this.handleAnswerChange(e.target));
+        showTimeWarning(message) {
+            // Create a temporary notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-20 right-6 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        handleAnswerChange(element) {
+            const questionId = element.dataset.questionId;
+            this.showSavingStatus(questionId);
+            this.debouncedSave();
+        }
+
+        showSavingStatus(questionId) {
+            const container = document.querySelector(`[data-question-id="${questionId}"]`);
+            const statusElement = container.querySelector('.answer-status');
+
+            statusElement.classList.remove('hidden');
+            setTimeout(() => {
+                statusElement.classList.add('hidden');
+            }, 1500);
+        }
+
+        collectAnswers() {
+            this.savedAnswers = {};
+
+            document.querySelectorAll('.question-container').forEach(container => {
+                const questionId = container.dataset.questionId;
+                if (!questionId) return;
+
+                // Radios (MCQ, true/false) - use querySelectorAll to inspect group
+                const radios = container.querySelectorAll('input[type="radio"].question-answer');
+                if (radios && radios.length > 0) {
+                    const selected = container.querySelector('input[type="radio"].question-answer:checked');
+                    if (selected) {
+                        // Save the raw value (we expect option.id for MCQ, 'true'/'false' for TF)
+                        this.savedAnswers[questionId] = selected.value;
                     }
-                });
-
-                // Save progress button
-                document.getElementById('save-progress-btn').addEventListener('click', () => {
-                    this.saveProgress();
-                });
-
-                // Submit exam button
-                document.getElementById('submit-exam-btn').addEventListener('click', () => {
-                    this.showConfirmationModal();
-                });
-
-                // Confirmation modal
-                document.getElementById('confirm-submit').addEventListener('click', () => {
-                    this.submitExam();
-                });
-
-                document.getElementById('cancel-submit').addEventListener('click', () => {
-                    this.hideConfirmationModal();
-                });
-
-                // Prevent form submission on enter key
-                document.getElementById('exam-form').addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                    }
-                });
-
-                // Warn before leaving
-                window.addEventListener('beforeunload', (e) => {
-                    if (this.savedAnswers.size > 0 && !this.isSubmitting) {
-                        e.preventDefault();
-                        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-                    }
-                });
-            }
-
-            startExam() {
-                document.getElementById('exam-content').classList.remove('hidden');
-                document.getElementById('start-exam-container').classList.add('hidden');
-                document.getElementById('exam-instructions').classList.add('hidden');
-
-                // Start the exam timer if not already started
-                if (window.examTimer && !window.examTimer.examStarted) {
-                    window.examTimer.startExamTimer(window.examTimer.examDuration);
+                    return; // move to next container
                 }
-            }
 
-            handleAnswerChange(element) {
-                const questionId = element.dataset.questionId;
-                this.showSavingStatus(questionId);
-                this.debouncedSave();
-            }
+                // Textareas (short_answer, essay)
+                const textarea = container.querySelector('textarea.question-answer');
+                if (textarea) {
+                    this.savedAnswers[questionId] = textarea.value.trim();
+                    return;
+                }
 
-            showSavingStatus(questionId) {
+                // Fill-in-the-blank (multiple inputs type="text")
+                const textInputs = container.querySelectorAll('input[type="text"].question-answer');
+                if (textInputs && textInputs.length > 0) {
+                    const arr = Array.from(textInputs).map(i => i.value.trim());
+                    this.savedAnswers[questionId] = arr;
+                    return;
+                }
+
+                // Fallback: single text input (if any)
+                const singleText = container.querySelector('input[type="text"].question-answer:not([data-blank-index])');
+                if (singleText) {
+                    this.savedAnswers[questionId] = singleText.value.trim();
+                }
+            });
+
+            console.log('📝 Collected answers:', this.savedAnswers);
+            return this.savedAnswers;
+        }
+
+
+        async saveProgress() {
+            const answers = this.collectAnswers();
+
+            const formData = new FormData();
+            formData.append('_token', '{{ csrf_token() }}');
+            formData.append('answers', JSON.stringify(answers));
+
+            try {
+                const response = await fetch('{{ route("student.exams.save-progress", ["exam" => $exam, "attempt" => $attempt]) }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.lastSaveTime = new Date();
+                    this.updateDebugInfo();
+                    console.log('💾 Progress saved:', result.saved_count, 'answers');
+                } else {
+                    console.error('❌ Save failed:', result.message);
+                }
+            } catch (error) {
+                console.error('💥 Save failed:', error);
+            }
+        }
+
+        async loadSavedProgress() {
+            try {
+                const response = await fetch('{{ route("student.exams.get-progress", ["exam" => $exam, "attempt" => $attempt]) }}');
+                const result = await response.json();
+
+                if (result.success && result.answers) {
+                    this.savedAnswers = result.answers;
+                    this.populateSavedAnswers();
+                    console.log('📥 Loaded saved progress:', Object.keys(this.savedAnswers).length, 'answers');
+                }
+            } catch (error) {
+                console.error('💥 Load progress failed:', error);
+            }
+        }
+
+        populateSavedAnswers() {
+            Object.entries(this.savedAnswers).forEach(([questionId, answer]) => {
                 const container = document.querySelector(`[data-question-id="${questionId}"]`);
-                const statusElement = container.querySelector('.answer-status');
+                if (!container) return;
 
-                statusElement.classList.remove('hidden');
-                setTimeout(() => {
-                    statusElement.classList.add('hidden');
-                }, 2000);
-            }
-
-            async saveProgress() {
-                const formData = new FormData();
-                const answers = this.collectAnswers();
-
-                formData.append('_token', '{{ csrf_token() }}');
-                formData.append('attempt_id', this.attemptId);
-                formData.append('answers', JSON.stringify(answers));
-
-                try {
-                    const response = await fetch('{{ route("student.exams.save-progress", $exam) }}', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
+                if (Array.isArray(answer)) {
+                    // Fill in the blank answers
+                    answer.forEach((value, index) => {
+                        const input = container.querySelector(`input[data-blank-index="${index}"]`);
+                        if (input) input.value = value;
                     });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        this.updateProgress(answers);
-                        this.savedAnswers = new Set(Object.keys(answers));
-                        this.updateSavedCount();
-                    }
-                } catch (error) {
-                    console.error('Save failed:', error);
+                    return;
                 }
-            }
 
-            collectAnswers() {
-                const answers = {};
-
-                document.querySelectorAll('.question-answer').forEach(element => {
-                    const questionId = element.dataset.questionId;
-
-                    if (element.type === 'radio') {
-                        if (element.checked) {
-                            answers[questionId] = element.value;
-                        }
-                    } else if (element.type === 'checkbox') {
-                        if (!answers[questionId]) {
-                            answers[questionId] = [];
-                        }
-                        if (element.checked) {
-                            answers[questionId].push(element.value);
-                        }
-                    } else {
-                        answers[questionId] = element.value;
+                // Try to restore radio first (MCQ / true_false)
+                // We search by value matching (strings)
+                if (answer !== null && answer !== undefined) {
+                    // radio value might be numeric (option id) or text like 'true'/'false'
+                    const radio = container.querySelector(`input[type="radio"].question-answer[value="${answer}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                        return;
                     }
-                });
 
-                return answers;
-            }
-
-            updateProgress(answers) {
-                const answeredCount = Object.keys(answers).length;
-                const totalQuestions = {{ $exam->questions->count() }};
-                const percentage = (answeredCount / totalQuestions) * 100;
-
-                document.getElementById('progress-text').textContent = `${answeredCount}/${totalQuestions}`;
-                document.getElementById('progress-bar').style.width = `${percentage}%`;
-            }
-
-            updateSavedCount() {
-                document.getElementById('saved-count').textContent = this.savedAnswers.size;
-            }
-
-            async loadSavedProgress() {
-                try {
-                    const response = await fetch(`/student/exams/{{ $exam->id }}/attempt/${this.attemptId}/progress`);
-                    const result = await response.json();
-
-                    if (result.success && result.answers) {
-                        this.populateAnswers(result.answers);
-                        this.updateProgress(result.answers);
-                        this.savedAnswers = new Set(Object.keys(result.answers));
-                        this.updateSavedCount();
+                    // Try radio with numeric cast (some browsers store numbers differently)
+                    const radioNumeric = container.querySelector(`input[type="radio"].question-answer[value="${Number(answer)}"]`);
+                    if (radioNumeric) {
+                        radioNumeric.checked = true;
+                        return;
                     }
-                } catch (error) {
-                    console.error('Load progress failed:', error);
                 }
-            }
 
-            populateAnswers(answers) {
-                Object.entries(answers).forEach(([questionId, answer]) => {
-                    const container = document.querySelector(`[data-question-id="${questionId}"]`);
-                    if (!container) return;
+                // If not radio, try textarea
+                const textarea = container.querySelector('textarea.question-answer');
+                if (textarea && typeof answer === 'string') {
+                    textarea.value = answer;
+                    return;
+                }
 
-                    if (Array.isArray(answer)) {
-                        // Checkbox answers
-                        answer.forEach(value => {
-                            const input = container.querySelector(`input[type="checkbox"][value="${value}"]`);
-                            if (input) input.checked = true;
-                        });
-                    } else {
-                        const input = container.querySelector(`input[type="radio"][value="${answer}"]`);
-                        if (input) {
-                            input.checked = true;
-                        } else {
-                            const textarea = container.querySelector('textarea');
-                            if (textarea) textarea.value = answer;
-                        }
-                    }
-                });
-            }
+                // If it's a single text input (fallback)
+                const singleText = container.querySelector('input[type="text"].question-answer:not([data-blank-index])');
+                if (singleText && typeof answer === 'string') {
+                    singleText.value = answer;
+                    return;
+                }
+            });
+        }
 
-            showConfirmationModal() {
-                document.getElementById('confirmation-modal').classList.remove('hidden');
-            }
 
-            hideConfirmationModal() {
-                document.getElementById('confirmation-modal').classList.add('hidden');
-            }
+        addAnswersToForm() {
+            const form = document.getElementById('exam-form');
+            if (!form) return;
 
-            async submitExam() {
-                if (this.isSubmitting) return;
+            // Remove any existing hidden answer fields we previously injected
+            document.querySelectorAll('input[name^="answers["][type="hidden"]').forEach(input => input.remove());
 
-                this.isSubmitting = true;
-                document.getElementById('submit-exam-btn').disabled = true;
-                document.getElementById('submit-exam-btn').textContent = 'Submitting...';
+            // Add all answers as hidden fields
+            Object.entries(this.savedAnswers).forEach(([questionId, answer]) => {
+                // if array, store as JSON string so server can decode (answers[Q] => JSON)
+                if (Array.isArray(answer)) {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = `answers[${questionId}]`;
+                    hiddenInput.value = JSON.stringify(answer);
+                    form.appendChild(hiddenInput);
+                    return;
+                }
 
-                // Save final progress
+                // Non-array: add single hidden input
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = `answers[${questionId}]`;
+                hiddenInput.value = (answer === null || answer === undefined) ? '' : answer;
+                form.appendChild(hiddenInput);
+            });
+
+            console.log('📤 Added answers to form for submission:', this.savedAnswers);
+        }
+
+        showConfirmationModal() {
+            document.getElementById('confirmation-modal').classList.remove('hidden');
+        }
+
+        hideConfirmationModal() {
+            document.getElementById('confirmation-modal').classList.add('hidden');
+        }
+
+        async submitExam() {
+            if (this.isSubmitting) return;
+
+            this.isSubmitting = true;
+            const submitBtn = document.getElementById('submit-exam-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Submitting...</span>';
+
+            try {
+                // Final save
                 await this.saveProgress();
 
-                // Submit the form
-                document.getElementById('exam-form').submit();
-            }
+                // Add answers to form for submission
+                this.addAnswersToForm();
 
-            debouncedSave() {
-                clearTimeout(this.saveTimeout);
-                this.saveTimeout = setTimeout(() => {
-                    this.saveProgress();
-                }, 1000);
+                console.log('🚀 Submitting exam with answers:', this.savedAnswers);
+
+                // Submit form
+                document.getElementById('exam-form').submit();
+
+            } catch (error) {
+                console.error('❌ Submission failed:', error);
+                this.isSubmitting = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Submit Exam</span>';
+
+                alert('Submission failed. Please try again.');
             }
         }
 
-        // Initialize the exam system
-        document.addEventListener('DOMContentLoaded', function() {
-            const examStartTime = '{{ $exam->start_time }}';
-            const examDuration = {{ $exam->duration }};
-            const attemptId = '{{ $attempt->id }}';
-            const examId = '{{ $exam->id }}';
+        handleTimeUp() {
+            clearInterval(this.timerInterval);
+            console.log('⏰ Time up! Auto-submitting...');
+            this.autoSubmitExam();
+        }
 
-            // Initialize timer
-            window.examTimer = new ExamTimer(examStartTime, examDuration, attemptId);
+        async autoSubmitExam() {
+            await this.saveProgress();
+            this.addAnswersToForm();
+            document.getElementById('exam-form').submit();
+        }
 
-            // Initialize exam manager
-            window.examManager = new ExamManager(examId, attemptId);
-        });
-    </script>
-@endsection
+        updateDebugInfo() {
+            if (!document.getElementById('debug-answer-count')) return;
+
+            document.getElementById('debug-answer-count').textContent =
+                Object.keys(this.savedAnswers).length;
+            document.getElementById('debug-time-remaining').textContent =
+                this.timeRemaining;
+
+            if (this.lastSaveTime) {
+                document.getElementById('debug-last-save').textContent =
+                    this.lastSaveTime.toLocaleTimeString();
+            }
+        }
+
+        debouncedSave() {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                this.saveProgress();
+            }, 1000);
+        }
+    }
+
+    // Initialize exam
+    document.addEventListener('DOMContentLoaded', function() {
+        @if($attempt->status === 'in_progress')
+        const examId = '{{ $exam->id }}';
+        const attemptId = '{{ $attempt->id }}';
+        const timeData = @json($timeData);
+
+        console.log('🚀 Starting exam with time data:', timeData);
+        window.examManager = new ExamManager(examId, attemptId, timeData);
+        @endif
+    });
+</script>

@@ -3,8 +3,6 @@
 @section('title', 'Admin Dashboard - Lincoln eLearning')
 
 @section('content')
-    <!-- DEBUG INFO -->
-
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="mb-8">
@@ -12,7 +10,21 @@
                 <p class="text-gray-600 dark:text-gray-300 mt-2">Set up a comprehensive examination for your students</p>
             </div>
 
-            <form action="{{ auth()->user()->isAdmin() ? route('admin.exams.store') : route('teacher.exams.store') }}" method="POST" id="exam-form">
+            <!-- Timezone Information -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                    <i class="fas fa-clock text-blue-600 dark:text-blue-400 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Timezone Information</h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                            All times are in <strong>{{ $timezone ?? 'Africa/Nairobi' }}</strong> timezone.
+                            Current time: {{ now()->timezone($timezone ?? 'Africa/Nairobi')->format('Y-m-d H:i:s') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <form action="{{ auth()->user()->isAdmin() ? route('admin.exams.store') : route('teacher.exams.store') }}" method="POST" id="exam-form" novalidate>
                 @csrf
                 <input type="hidden" name="is_draft" id="is_draft" value="0">
                 <input type="hidden" name="selected_bank_questions" id="selected_bank_questions" value="">
@@ -99,50 +111,100 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
                             <label for="start_time" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Time *</label>
-                            <input type="datetime-local" id="start_time" name="start_time" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" value="{{ old('start_time') }}" required>
+                            <input type="datetime-local"
+                                   id="start_time"
+                                   name="start_time"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   value="{{ old('start_time', isset($exam) ? \Carbon\Carbon::parse($exam->start_time)->format('Y-m-d\TH:i') : '') }}"
+                                   min="{{ now()->format('Y-m-d\TH:i') }}"
+                                   required>
                             @error('start_time')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">Timezone: Africa/Kampala</small>
                         </div>
 
                         <div>
                             <label for="end_time" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Time *</label>
-                            <input type="datetime-local" id="end_time" name="end_time" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" value="{{ old('end_time') }}" required>
+                            <input type="datetime-local"
+                                   id="end_time"
+                                   name="end_time"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   value="{{ old('end_time', isset($exam) ? \Carbon\Carbon::parse($exam->end_time)->format('Y-m-d\TH:i') : '') }}"
+                                   min="{{ now()->addMinutes(5)->format('Y-m-d\TH:i') }}"
+                                   required>
                             @error('end_time')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">Must be after start time</small>
                         </div>
 
                         <div>
                             <label for="duration" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration (minutes) *</label>
-                            <input type="number" id="duration" name="duration" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="120" value="{{ old('duration') }}" required>
+                            <input type="number"
+                                   id="duration"
+                                   name="duration"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   placeholder="60"
+                                   value="{{ old('duration') }}"
+                                   min="5"
+                                   max="480"
+                                   required>
                             @error('duration')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">5-480 minutes</small>
                         </div>
 
                         <div>
                             <label for="total_marks" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Total Points *</label>
-                            <input type="number" id="total_marks" name="total_marks" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="100" value="{{ old('total_marks') }}" required>
+                            <input type="number"
+                                   id="total_marks"
+                                   name="total_marks"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   placeholder="100"
+                                   value="{{ old('total_marks') }}"
+                                   min="1"
+                                   max="1000"
+                                   required>
                             @error('total_marks')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">Auto-calculated from questions</small>
                         </div>
 
                         <div>
                             <label for="passing_marks" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Passing Marks *</label>
-                            <input type="number" id="passing_marks" name="passing_marks" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="40" value="{{ old('passing_marks') }}" required>
+                            <input type="number"
+                                   id="passing_marks"
+                                   name="passing_marks"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   placeholder="40"
+                                   value="{{ old('passing_marks') }}"
+                                   min="0"
+                                   max="1000"
+                                   required>
                             @error('passing_marks')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">Must be less than total points</small>
                         </div>
 
                         <div>
                             <label for="max_attempts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Attempts *</label>
-                            <input type="number" id="max_attempts" name="max_attempts" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="1" value="{{ old('max_attempts', 1) }}" required>
+                            <input type="number"
+                                   id="max_attempts"
+                                   name="max_attempts"
+                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                   placeholder="1"
+                                   value="{{ old('max_attempts', 1) }}"
+                                   min="1"
+                                   max="10"
+                                   required>
                             @error('max_attempts')
                             <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
+                            <small class="text-xs text-gray-500 dark:text-gray-400 mt-1">1-10 attempts</small>
                         </div>
                     </div>
                 </div>
@@ -303,10 +365,14 @@
 
                 <!-- Action Buttons -->
                 <div class="flex justify-end space-x-4">
-                    <button type="button" id="save-draft-btn" class="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                    <button type="button"
+                            id="save-draft-btn"
+                            class="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                         Save as Draft
                     </button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
+                    <button type="submit"
+                            id="publish-exam-btn"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
                         Create Exam
                     </button>
                 </div>
@@ -408,9 +474,13 @@
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white">New Question <span class="question-number">1</span></h3>
                 <div class="flex items-center space-x-3">
                     <label class="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                        <input type="checkbox" name="questions[0][save_to_bank]" value="1" class="rounded text-blue-600 focus:ring-blue-500 mr-2">
+                        <!-- CRITICAL: Ensure the hidden input comes FIRST -->
+                        <input type="hidden" name="questions[0][save_to_bank]" value="0" />
+                        <input type="checkbox" name="questions[0][save_to_bank]" value="1"
+                               class="rounded text-blue-600 focus:ring-blue-500 mr-2 save-to-bank-checkbox" />
                         Save to Bank
                     </label>
+
                     <button type="button" class="remove-question text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -432,12 +502,17 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Points</label>
                     <input type="number" name="questions[0][points]" class="question-points w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" value="5" min="1">
                 </div>
-
             </div>
 
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question Text</label>
-                <textarea name="questions[0][question_text]" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" rows="3" placeholder="Enter your question here..." required></textarea>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question Text *</label>
+                <textarea
+                    name="questions[0][question_text]"
+                    class="question-text-input w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows="3"
+                    placeholder="Enter your question here..."
+                    required
+                ></textarea>
             </div>
 
             <!-- Multiple Choice Options -->
@@ -445,14 +520,14 @@
                 <div class="option-group space-y-3">
                     <div class="flex items-center option-item">
                         <input type="radio" name="questions[0][correct_answer]" value="0" class="mr-3 text-blue-600" checked>
-                        <input type="text" name="questions[0][options][0]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option A" required>
+                        <input type="text" name="questions[0][options][0]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option A">
                         <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     <div class="flex items-center option-item">
                         <input type="radio" name="questions[0][correct_answer]" value="1" class="mr-3 text-blue-600">
-                        <input type="text" name="questions[0][options][1]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option B" required>
+                        <input type="text" name="questions[0][options][1]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option B">
                         <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
                             <i class="fas fa-times"></i>
                         </button>
@@ -506,7 +581,7 @@
                     <div class="space-y-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question with Blanks</label>
-                            <textarea name="questions[0][blank_question]" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="E.g., The capital of France is [blank]."></textarea>
+                            <textarea name="questions[0][question_text]" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="E.g., The capital of France is [blank]."></textarea>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Correct Answers (comma-separated)</label>
@@ -657,7 +732,143 @@
             const previewSummary = document.getElementById('preview-summary');
             const validationAlertsContainer = document.getElementById('validation-alerts-container');
 
-            // Core Functions - Defined First
+            function syncFormFieldsBeforeSubmit() {
+                console.log('🔄 Writing STATE → DOM before submit...');
+
+                document.querySelectorAll('.question-item').forEach((questionItem, index) => {
+                    const questionData = state.newQuestionsData.get(index);
+                    if (!questionData) return;
+
+                    // --- 1. SYNC QUESTION TEXT ---
+                    // For normal question_text
+                    const textInput = questionItem.querySelector('.question-text-input');
+                    if (textInput) {
+                        textInput.value = questionData.question_text ?? '';
+                    }
+
+                    // For fill in the blanks (special textarea)
+                    const blankTextInput = questionItem.querySelector('textarea[name*="[question_text]"]:not(.question-text-input)');
+                    if (blankTextInput) {
+                        blankTextInput.value = questionData.question_text ?? '';
+                    }
+
+                    // --- 2. SYNC QUESTION TYPE ---
+                    const typeSelect = questionItem.querySelector('.question-type');
+                    if (typeSelect) {
+                        typeSelect.value = questionData.type ?? 'mcq';
+                    }
+
+                    // --- 3. SYNC POINTS ---
+                    const pointsInput = questionItem.querySelector('.question-points');
+                    if (pointsInput) {
+                        pointsInput.value = questionData.points ?? 5;
+                    }
+
+                    // --- 4. SYNC SAVE TO BANK ---
+                    const saveCheckbox = questionItem.querySelector('input[type="checkbox"][name*="save_to_bank"]');
+                    if (saveCheckbox) {
+                        saveCheckbox.checked = !!questionData.save_to_bank;
+                        // CRITICAL: Ensure the checkbox value is properly set for form submission
+                        saveCheckbox.value = questionData.save_to_bank ? '1' : '0';
+                    }
+
+                    // --- 5. SYNC MCQ OPTIONS ---
+                    if (questionData.type === 'mcq') {
+                        const optionsInputs = questionItem.querySelectorAll('input[type="text"][name*="[options]"]');
+                        optionsInputs.forEach((input, optIndex) => {
+                            input.value = questionData.options?.[optIndex]?.text ?? '';
+                        });
+
+                        const correctRadio = questionItem.querySelector(`input[type="radio"][value="${questionData.correct_answer}"]`);
+                        if (correctRadio) {
+                            correctRadio.checked = true;
+                        }
+                    }
+
+                    // --- 6. SYNC TRUE/FALSE ---
+                    if (questionData.type === 'true_false') {
+                        const correctRadio = questionItem.querySelector(`input[type="radio"][value="${questionData.correct_answer}"]`);
+                        if (correctRadio) {
+                            correctRadio.checked = true;
+                        }
+                    }
+
+                    // --- 7. SYNC SHORT ANSWER ---
+                    if (questionData.type === 'short_answer') {
+                        const expectedAns = questionItem.querySelector('textarea[name*="[expected_answer]"]');
+                        if (expectedAns) {
+                            expectedAns.value = questionData.expected_answer ?? '';
+                        }
+                    }
+
+                    // --- 8. SYNC ESSAY ---
+                    if (questionData.type === 'essay') {
+                        const rubric = questionItem.querySelector('textarea[name*="[grading_rubric]"]');
+                        if (rubric) {
+                            rubric.value = questionData.grading_rubric ?? '';
+                        }
+                    }
+
+                    // --- 9. SYNC FILL BLANK ---
+                    if (questionData.type === 'fill_blank') {
+                        const blankAns = questionItem.querySelector('input[name*="[blank_answers]"]');
+                        if (blankAns) {
+                            blankAns.value = questionData.blank_answers ?? '';
+                        }
+                    }
+
+                    console.log(`✅ STATE → DOM synced question ${index} with save_to_bank: ${questionData.save_to_bank}`);
+                });
+
+                console.log('🔥 FINAL SYNC COMPLETE — DOM now matches JS state');
+            }
+
+            // Time Validation Functions
+            function calculateAndValidateDuration() {
+                const startTimeInput = document.getElementById('start_time');
+                const endTimeInput = document.getElementById('end_time');
+                const durationInput = document.getElementById('duration');
+
+                if (!startTimeInput.value || !endTimeInput.value) return;
+
+                const startTime = new Date(startTimeInput.value + 'T00:00:00');
+                const endTime = new Date(endTimeInput.value + 'T00:00:00');
+
+                const durationMs = endTime - startTime;
+                const durationMinutes = Math.floor(durationMs / (1000 * 60));
+
+                if (!durationInput.value || Math.abs(durationInput.value - durationMinutes) > 5) {
+                    durationInput.value = durationMinutes;
+                }
+            }
+
+            function showTimeValidationError(message) {
+                let errorDiv = document.getElementById('time-validation-error');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.id = 'time-validation-error';
+                    errorDiv.className = 'mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg';
+
+                    const endTimeInput = document.getElementById('end_time');
+                    endTimeInput.parentNode.appendChild(errorDiv);
+                }
+
+                errorDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-600 dark:text-red-400 mr-2"></i>
+                    <span class="text-red-700 dark:text-red-300 text-sm">${message}</span>
+                </div>
+            `;
+            }
+
+            function hideTimeValidationError() {
+                const errorDiv = document.getElementById('time-validation-error');
+                if (errorDiv) {
+                    errorDiv.remove();
+                }
+            }
+
+            // Core Functions
             function calculateTotalPoints() {
                 let total = 0;
 
@@ -707,6 +918,62 @@
                     clearTimeout(timeout);
                     timeout = setTimeout(later, wait);
                 };
+            }
+
+            // Form validation function
+            function validateFormFields() {
+                let isValid = true;
+                const errors = [];
+
+                // Validate visible question fields based on their type
+                document.querySelectorAll('.question-item').forEach((questionItem, index) => {
+                    const questionText = questionItem.querySelector('.question-text-input').value;
+
+                    // Validate question text
+                    if (!questionText.trim()) {
+                        isValid = false;
+                        errors.push(`Question ${index + 1}: Question text is required`);
+                        highlightInvalidField(questionItem.querySelector('.question-text-input'));
+                    }
+
+                    // Validate based on question type
+                    const questionType = questionItem.querySelector('.question-type').value;
+                    if (questionType === 'mcq') {
+                        const options = questionItem.querySelectorAll('input[name$="[options][]"]');
+                        let hasOptions = false;
+                        let filledOptions = 0;
+
+                        options.forEach(option => {
+                            if (option.value.trim()) {
+                                hasOptions = true;
+                                filledOptions++;
+                            }
+                        });
+
+                        if (!hasOptions) {
+                            isValid = false;
+                            errors.push(`Question ${index + 1}: At least one option is required for MCQ`);
+                            highlightInvalidField(options[0]);
+                        } else if (filledOptions < 2) {
+                            isValid = false;
+                            errors.push(`Question ${index + 1}: At least two options are required for MCQ`);
+                            highlightInvalidField(options[0]);
+                        }
+                    }
+                });
+
+                return { isValid, errors };
+            }
+
+            function highlightInvalidField(field) {
+                field.classList.add('border-red-500', 'border-2');
+                field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                field.focus();
+
+                // Remove highlight after 3 seconds
+                setTimeout(() => {
+                    field.classList.remove('border-red-500', 'border-2');
+                }, 3000);
             }
 
             // Validation Functions
@@ -819,7 +1086,7 @@
                     }
 
                     if (question.type === 'fill_blank') {
-                        if (!question.blank_question || !question.blank_question.includes('[blank]')) {
+                        if (!question.question_text || !question.question_text.includes('[blank]')) {
                             issues.push('Fill blank question must contain [blank] placeholder');
                         }
                     }
@@ -864,27 +1131,27 @@
                 const title = type === 'error' ? 'Error' : 'Warning';
 
                 alert.innerHTML = `
-                <div class="flex items-start">
-                    <i class="fas ${icon} mt-0.5 mr-3 ${
+            <div class="flex items-start">
+                <i class="fas ${icon} mt-0.5 mr-3 ${
                     type === 'error'
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-yellow-600 dark:text-yellow-400'
                 }"></i>
-                    <div class="flex-1">
-                        <h4 class="text-sm font-medium ${
+                <div class="flex-1">
+                    <h4 class="text-sm font-medium ${
                     type === 'error'
                         ? 'text-red-800 dark:text-red-300'
                         : 'text-yellow-800 dark:text-yellow-300'
                 }">${title}</h4>
-                        <p class="text-sm ${
+                    <p class="text-sm ${
                     type === 'error'
                         ? 'text-red-700 dark:text-red-400'
                         : 'text-yellow-700 dark:text-yellow-400'
                 } mt-1">${validation.message}</p>
-                        ${validation.details ? renderValidationDetails(validation.details, type) : ''}
-                    </div>
+                    ${validation.details ? renderValidationDetails(validation.details, type) : ''}
                 </div>
-            `;
+            </div>
+        `;
 
                 return alert;
             }
@@ -895,9 +1162,9 @@
                 const textColor = type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400';
 
                 return `
-                <div class="mt-2 text-xs ${textColor}">
-                    <ul class="list-disc list-inside space-y-1">
-                        ${details.map(detail => {
+            <div class="mt-2 text-xs ${textColor}">
+                <ul class="list-disc list-inside space-y-1">
+                    ${details.map(detail => {
                     if (detail.source === 'bank') {
                         return `<li>Bank Question ID ${detail.id}: ${detail.preview || detail.issue}</li>`;
                     } else if (detail.source === 'new') {
@@ -907,9 +1174,9 @@
                     }
                     return `<li>${detail.preview || detail.issue}</li>`;
                 }).join('')}
-                    </ul>
-                </div>
-            `;
+                </ul>
+            </div>
+        `;
             }
 
             // Preview functionality
@@ -994,7 +1261,13 @@
                 item.querySelector('.question-source').textContent = source === 'bank' ? 'From Bank' : 'New Question';
                 item.querySelector('.question-points').textContent = `${question.points} points`;
                 item.querySelector('.question-number').textContent = questionNumber;
-                item.querySelector('.question-text').textContent = question.question_text || '[Question text not entered]';
+
+                let qText = question.question_text;
+                if (question.type === 'fill_blank' && question.details?.blank_answers) {
+                    // Optionally format, e.g., replace [blank] with ____
+                    qText = qText.replace(/\[blank\]/g, '_____');
+                }
+                item.querySelector('.question-text').textContent = qText || '[Question text not entered]';
 
                 // Add answer area based on question type
                 const answerArea = item.querySelector('.answer-area');
@@ -1014,9 +1287,9 @@
                                 const answerOption = document.createElement('div');
                                 answerOption.className = 'flex items-center mb-2';
                                 answerOption.innerHTML = `
-                                <input type="radio" name="student_answer_${source}_${id}" value="${index}" class="mr-3 text-blue-600">
-                                <span>${String.fromCharCode(65 + index)}. ${option.text}</span>
-                            `;
+                            <input type="radio" name="student_answer_${source}_${id}" value="${index}" class="mr-3 text-blue-600">
+                            <span>${String.fromCharCode(65 + index)}. ${option.text}</span>
+                        `;
                                 answerInput.appendChild(answerOption);
                             }
                         });
@@ -1025,29 +1298,29 @@
                     }
                 } else if (question.type === 'true_false') {
                     answerInput.innerHTML = `
-                    <div class="space-y-2">
-                        <label class="flex items-center">
-                            <input type="radio" name="student_answer_${source}_${id}" value="true" class="mr-3 text-blue-600">
-                            <span>True</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="student_answer_${source}_${id}" value="false" class="mr-3 text-blue-600">
-                            <span>False</span>
-                        </label>
-                    </div>
-                `;
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="student_answer_${source}_${id}" value="true" class="mr-3 text-blue-600">
+                        <span>True</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="student_answer_${source}_${id}" value="false" class="mr-3 text-blue-600">
+                        <span>False</span>
+                    </label>
+                </div>
+            `;
                 } else if (question.type === 'short_answer') {
                     answerInput.innerHTML = `
-                    <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="Type your short answer here..."></textarea>
-                `;
+                <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="2" placeholder="Type your short answer here..."></textarea>
+            `;
                 } else if (question.type === 'essay') {
                     answerInput.innerHTML = `
-                    <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="4" placeholder="Write your essay answer here..."></textarea>
-                `;
+                <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" rows="4" placeholder="Write your essay answer here..."></textarea>
+            `;
                 } else if (question.type === 'fill_blank') {
                     answerInput.innerHTML = `
-                    <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" placeholder="Enter your answer...">
-                `;
+                <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white" placeholder="Enter your answer...">
+            `;
                 }
 
                 return questionElement;
@@ -1071,11 +1344,11 @@
             async function loadBankQuestions() {
                 const content = document.getElementById('question-bank-content');
                 content.innerHTML = `
-        <div class="text-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Loading questions...</p>
-        </div>
-    `;
+    <div class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Loading questions...</p>
+    </div>
+`;
 
                 try {
                     const questionBankRoute = document.getElementById('question-bank-route')?.value;
@@ -1112,17 +1385,17 @@
 
                 } catch (error) {
                     content.innerHTML = `
-            <div class="text-center py-8 text-red-600 dark:text-red-400">
-                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                <p>Failed to load questions. Please try again.</p>
-                <p class="text-sm mt-2">Error: ${error.message}</p>
-                <div class="mt-3">
-                    <button type="button" onclick="loadBankQuestions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
-                        <i class="fas fa-refresh mr-2"></i>Retry
-                    </button>
-                </div>
+        <div class="text-center py-8 text-red-600 dark:text-red-400">
+            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+            <p>Failed to load questions. Please try again.</p>
+            <p class="text-sm mt-2">Error: ${error.message}</p>
+            <div class="mt-3">
+                <button type="button" onclick="loadBankQuestions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                    <i class="fas fa-refresh mr-2"></i>Retry
+                </button>
             </div>
-        `;
+        </div>
+    `;
                 }
             }
 
@@ -1132,12 +1405,12 @@
 
                 if (questions.length === 0) {
                     content.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
-                <p class="text-gray-500 dark:text-gray-400">No questions found</p>
-                <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters</p>
-            </div>
-        `;
+        <div class="text-center py-8">
+            <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
+            <p class="text-gray-500 dark:text-gray-400">No questions found</p>
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters</p>
+        </div>
+    `;
                     return;
                 }
 
@@ -1159,24 +1432,32 @@
                     item.querySelector('.question-points').textContent = question.points;
                     item.querySelector('.question-id').textContent = question.id;
 
-                    // Add preview for MCQ questions
+                    // Always store full data
+                    item.setAttribute('data-question-data', JSON.stringify(question));
+
+                    // Add preview for all types
+                    const preview = item.querySelector('.question-preview');
+                    preview.classList.remove('hidden');
                     if (question.type === 'mcq' && question.options) {
-                        const preview = item.querySelector('.question-preview');
-                        preview.classList.remove('hidden');
                         question.options.forEach(option => {
                             const optionDiv = document.createElement('div');
                             optionDiv.className = 'flex items-center';
                             optionDiv.innerHTML = `
-                    <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
-                    <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
-                        ${option.option_text}
-                    </span>
-                `;
+                <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
+                <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
+                    ${option.option_text}
+                </span>
+            `;
                             preview.appendChild(optionDiv);
                         });
-
-                        // Store the complete question data including options for later retrieval
-                        item.setAttribute('data-question-data', JSON.stringify(question));
+                    } else if (question.type === 'true_false') {
+                        preview.innerHTML = `<div>Correct: ${question.correct_answer}</div>`;
+                    } else if (question.type === 'fill_blank') {
+                        preview.innerHTML = `<div>Blanks: ${question.question_text}</div><div>Answers: ${question.correct_answer}</div>`;
+                    } else if (question.type === 'short_answer') {
+                        preview.innerHTML = `<div>Expected: ${question.correct_answer || 'N/A'}</div>`;
+                    } else if (question.type === 'essay') {
+                        preview.innerHTML = `<div>Rubric: ${question.details?.grading_rubric || 'N/A'}</div>`;
                     }
 
                     content.appendChild(questionElement);
@@ -1185,9 +1466,8 @@
                 document.getElementById('bank-results-count').textContent = `Found ${questions.length} questions`;
             }
 
-
             function handleBankQuestionCheckboxChange(e) {
-                if (e.target.classList.contains('bank-question-checkbox')) {
+                if (e.target.classList.contains('.bank-question-checkbox')) {
                     updateSelectedBankCount();
                 }
             }
@@ -1214,22 +1494,25 @@
                     if (!state.selectedQuestions.has(questionId)) {
                         const questionItem = checkbox.closest('.bank-question-item');
 
-                        // Try to get complete question data from data attribute first
                         const questionDataAttr = questionItem.getAttribute('data-question-data');
 
                         if (questionDataAttr) {
-                            // Use the complete question data from the AJAX response
-                            const questionData = JSON.parse(questionDataAttr);
-
-                            // Ensure options are properly formatted for our system
-                            if (questionData.options) {
-                                questionData.options = questionData.options.map(option => ({
-                                    text: option.option_text,
-                                    is_correct: option.is_correct
-                                }));
-                            }
-
-                            state.selectedQuestions.set(questionId, questionData);
+                            const question = JSON.parse(questionDataAttr);
+                            const formatted = {
+                                id: question.id,
+                                type: question.type,
+                                difficulty: question.difficulty,
+                                subject: question.subject?.name || 'Unknown',
+                                question_text: question.question_text,
+                                points: question.points,
+                                options: question.type === 'mcq' ? question.options.map(opt => ({
+                                    text: opt.option_text,
+                                    is_correct: opt.is_correct
+                                })) : [],
+                                correct_answer: question.correct_answer,
+                                details: question.details || {}
+                            };
+                            state.selectedQuestions.set(questionId, formatted);
                         } else {
                             // Fallback: extract from preview (original method)
                             const options = [];
@@ -1307,11 +1590,11 @@
                             const optionDiv = document.createElement('div');
                             optionDiv.className = 'flex items-center';
                             optionDiv.innerHTML = `
-                    <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
-                    <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
-                        ${option.text || option.option_text}
-                    </span>
-                `;
+                <span class="w-2 h-2 rounded-full ${option.is_correct ? 'bg-green-500' : 'bg-gray-300'} mr-2"></span>
+                <span class="${option.is_correct ? 'text-green-600 dark:text-green-400 font-medium' : ''}">
+                    ${option.text || option.option_text}
+                </span>
+            `;
                             optionsContainer.appendChild(optionDiv);
                         });
                     }
@@ -1368,10 +1651,19 @@
                     input.setAttribute('name', newName);
                 });
 
+                // Initialize checkbox state properly
+                const checkbox = questionElement.querySelector('.save-to-bank-checkbox');
+                const hiddenInput = questionElement.querySelector('input[type="hidden"][name*="save_to_bank"]');
+
+                if (checkbox && hiddenInput) {
+                    checkbox.checked = false; // Default to unchecked
+                    hiddenInput.value = '0';  // Default value
+                }
+
                 questionElement.querySelector('.question-number').textContent = state.newQuestionsCount;
                 newQuestionsContainer.appendChild(questionElement);
 
-                // Initialize question data with complete structure
+                // Initialize question data with complete structure - DEFAULT save_to_bank to '0'
                 state.newQuestionsData.set(questionIndex, {
                     type: 'mcq',
                     points: 5,
@@ -1380,8 +1672,8 @@
                     correct_answer: '0',
                     expected_answer: '',
                     grading_rubric: '',
-                    blank_question: '',
                     blank_answers: '',
+                    save_to_bank: '0', // CRITICAL: Default to NOT saving to bank
                     isNew: true
                 });
 
@@ -1429,12 +1721,12 @@
                 const optionDiv = document.createElement('div');
                 optionDiv.className = 'flex items-center option-item';
                 optionDiv.innerHTML = `
-                <input type="radio" name="questions[${questionIndex}][correct_answer]" value="${optionCount}" class="mr-3 text-blue-600">
-                <input type="text" name="questions[${questionIndex}][options][${optionCount}]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option ${String.fromCharCode(65 + optionCount)}" required>
-                <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
+            <input type="radio" name="questions[${questionIndex}][correct_answer]" value="${optionCount}" class="mr-3 text-blue-600">
+            <input type="text" name="questions[${questionIndex}][options][${optionCount}]" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white" placeholder="Option ${String.fromCharCode(65 + optionCount)}">
+            <button type="button" class="remove-option ml-2 text-red-600 hover:text-red-800">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
 
                 optionGroup.appendChild(optionDiv);
                 updateOptionButtons(questionItem);
@@ -1530,6 +1822,7 @@
                 }
             }
 
+            // CRITICAL FIX: Handle new questions input with proper form field syncing
             function handleNewQuestionsInput(e) {
                 const questionItem = e.target.closest('.question-item');
                 const questionIndex = getQuestionIndex(questionItem);
@@ -1542,16 +1835,23 @@
                     updateTotalPoints();
                 } else if (e.target.classList.contains('question-type')) {
                     questionData.type = e.target.value;
-                } else if (e.target.name && e.target.name.includes('question_text')) {
+                    // Also update the form field
+                    e.target.value = questionData.type;
+                } else if (e.target.classList.contains('question-text-input')) {
+                    // CRITICAL FIX: Ensure question text is captured and synced
                     questionData.question_text = e.target.value;
+                    console.log(`📝 Question ${questionIndex} text captured:`, e.target.value);
+                    // Ensure the form field has the value
+                    e.target.value = questionData.question_text;
                 } else if (e.target.name && e.target.name.includes('expected_answer')) {
                     questionData.expected_answer = e.target.value;
+                    e.target.value = questionData.expected_answer;
                 } else if (e.target.name && e.target.name.includes('grading_rubric')) {
                     questionData.grading_rubric = e.target.value;
-                } else if (e.target.name && e.target.name.includes('blank_question')) {
-                    questionData.blank_question = e.target.value;
+                    e.target.value = questionData.grading_rubric;
                 } else if (e.target.name && e.target.name.includes('blank_answers')) {
                     questionData.blank_answers = e.target.value;
+                    e.target.value = questionData.blank_answers;
                 } else if (e.target.name && e.target.name.includes('options')) {
                     // Update MCQ options
                     const optionIndex = parseInt(e.target.name.match(/options\]\[(\d+)\]/)[1]);
@@ -1559,6 +1859,8 @@
                         questionData.options[optionIndex] = { text: '', is_correct: false };
                     }
                     questionData.options[optionIndex].text = e.target.value;
+                    // Sync the form field
+                    e.target.value = questionData.options[optionIndex].text;
                 }
 
                 updatePreview();
@@ -1574,8 +1876,20 @@
                 if (e.target.name && e.target.name.includes('correct_answer')) {
                     questionData.correct_answer = e.target.value;
                     updatePreview();
+                } else if (e.target.name && e.target.name.includes('save_to_bank')) {
+                    // CRITICAL FIX: Properly handle the checkbox state
+                    questionData.save_to_bank = e.target.checked ? '1' : '0';
+
+                    // Also update the hidden input value
+                    const hiddenInput = questionItem.querySelector('input[type="hidden"][name*="save_to_bank"]');
+                    if (hiddenInput) {
+                        hiddenInput.value = questionData.save_to_bank;
+                    }
+
+                    console.log(`📝 Question ${questionIndex} save_to_bank updated:`, questionData.save_to_bank);
                 }
             }
+
 
             // Main initialization
             function initializeEventListeners() {
@@ -1599,8 +1913,96 @@
                 document.getElementById('add-question-btn').addEventListener('click', addNewQuestion);
                 document.getElementById('add-another-question').addEventListener('click', addNewQuestion);
 
+                // Time validation
+                document.getElementById('start_time')?.addEventListener('change', calculateAndValidateDuration);
+                document.getElementById('end_time')?.addEventListener('change', calculateAndValidateDuration);
+                document.getElementById('duration')?.addEventListener('input', function() {
+                    // When duration is manually set, adjust end time
+                    const startTimeInput = document.getElementById('start_time');
+                    const endTimeInput = document.getElementById('end_time');
+
+                    if (startTimeInput.value && this.value) {
+                        const startTime = new Date(startTimeInput.value);
+                        const durationMinutes = parseInt(this.value);
+                        const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+                        endTimeInput.value = endTime.toISOString().slice(0, 16);
+                        hideTimeValidationError();
+                    }
+                });
+
                 // Exam details changes
                 document.getElementById('total_marks').addEventListener('input', updatePreview);
+
+                // CRITICAL FIX: Updated form submission handlers with sync
+                document.getElementById('save-draft-btn')?.addEventListener('click', function(e) {
+                    document.getElementById('is_draft').value = '1';
+
+                    // CRITICAL: Sync form fields before submission
+                    syncFormFieldsBeforeSubmit();
+
+                    // Validate form before submitting draft
+                    const formValidation = validateFormFields();
+                    if (!formValidation.isValid) {
+                        e.preventDefault();
+                        alert('Please fix the following errors before saving as draft:\n\n' + formValidation.errors.join('\n'));
+                        return false;
+                    }
+                });
+
+                document.getElementById('publish-exam-btn')?.addEventListener('click', function(e) {
+                    document.getElementById('is_draft').value = '0';
+
+                    // CRITICAL: Sync form fields before submission
+                    syncFormFieldsBeforeSubmit();
+
+                    // Validate before submitting
+                    const validationResults = validateExam();
+                    const formValidation = validateFormFields();
+
+                    if (!validationResults.isValid || !formValidation.isValid) {
+                        e.preventDefault();
+                        let errorMessage = 'Please fix the following errors before publishing the exam:\n\n';
+
+                        if (!validationResults.isValid) {
+                            errorMessage += validationResults.errors.map(err => `• ${err.message}`).join('\n');
+                        }
+
+                        if (!formValidation.isValid) {
+                            errorMessage += formValidation.errors.map(err => `• ${err}`).join('\n');
+                        }
+
+                        alert(errorMessage);
+                        switchTab('preview');
+                        return false;
+                    }
+                });
+
+                document.getElementById('exam-form')?.addEventListener('submit', function(e) {
+                    const isDraft = document.getElementById('is_draft').value === '1';
+
+                    // CRITICAL: Always sync form fields before submission
+                    syncFormFieldsBeforeSubmit();
+
+                    if (!isDraft) {
+                        const validationResults = validateExam();
+                        const formValidation = validateFormFields();
+
+                        if (!validationResults.isValid || !formValidation.isValid) {
+                            e.preventDefault();
+                            alert('Cannot publish exam with errors. Please fix the issues or save as draft.');
+                            switchTab('preview');
+                            return false;
+                        }
+                    }
+
+                    // Debug: Log the form data before submission
+                    console.log('📝 FORM SUBMISSION DATA:');
+                    const formData = new FormData(this);
+                    for (let [key, value] of formData.entries()) {
+                        console.log(`${key}:`, value);
+                    }
+                });
 
                 // Event delegation for dynamic elements
                 selectedQuestionsContainer.addEventListener('click', handleSelectedQuestionsClick);

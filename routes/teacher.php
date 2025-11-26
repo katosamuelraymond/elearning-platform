@@ -46,19 +46,32 @@ Route::middleware('auth')->prefix('teacher')->name('teacher.')->group(function (
         Route::get('/create', [TeacherExamsController::class, 'create'])->name('create');
         Route::post('/', [TeacherExamsController::class, 'store'])->name('store');
         Route::get('/{exam}', [TeacherExamsController::class, 'show'])->name('show');
+
+        // Manual Grading Routes - ADD THESE
+        Route::post('/{exam}/attempts/{attempt}/update-score', [TeacherExamsController::class, 'updateScore'])->name('attempts.update-score');
+        Route::post('/{exam}/attempts/{attempt}/bulk-update-grades', [TeacherExamsController::class, 'bulkUpdateGrades'])->name('attempts.bulk-update-grades');
+
         Route::get('/{exam}/edit', [TeacherExamsController::class, 'edit'])->name('edit');
         Route::put('/{exam}', [TeacherExamsController::class, 'update'])->name('update');
         Route::delete('/{exam}', [TeacherExamsController::class, 'destroy'])->name('destroy');
-        Route::get('/{exam}/attempts', [TeacherExamsController::class, 'attempts'])->name('attempts.index');
-        Route::get('/{exam}/attempts/{attempt}', [TeacherExamsController::class, 'showAttempt'])->name('attempts.show');
-        Route::get('exams/{exam}/print', [TeacherExamsController::class, 'print'])->name('print');
-        Route::get('exams/{exam}/print-pdf', [TeacherExamsController::class, 'printPDF'])->name('print-pdf');
-        Route::patch('exams/{exam}/toggle-publish', [TeacherExamsController::class, 'togglePublish'])->name('toggle-publish');
-        Route::patch('exams/{exam}/toggle-archive', [TeacherExamsController::class, 'toggleArchive'])->name('toggle-archive');
 
+        // Exam Attempts
+        Route::get('/{exam}/attempts', [TeacherExamsController::class, 'attempts'])->name('attempts');
+        Route::get('/{exam}/attempts/{attempt}', [TeacherExamsController::class, 'showAttempt'])->name('attempts.show');
+
+        // Print and PDF
+        Route::get('/{exam}/print', [TeacherExamsController::class, 'print'])->name('print');
+        Route::get('/{exam}/print-pdf', [TeacherExamsController::class, 'printPDF'])->name('print-pdf');
+
+        // Status Management
+        Route::patch('/{exam}/toggle-publish', [TeacherExamsController::class, 'togglePublish'])->name('toggle-publish');
+        Route::patch('/{exam}/toggle-archive', [TeacherExamsController::class, 'toggleArchive'])->name('toggle-archive');
+        Route::post('/{exam}/release-results', [TeacherExamsController::class, 'releaseResults'])
+            ->name('release-results');
+        Route::post('/{exam}/withdraw-results', [TeacherExamsController::class, 'withdrawResults'])
+            ->name('withdraw-results');
     });
 
-    // routes/teacher.php
     Route::prefix('questions')->name('questions.')->group(function () {
         Route::get('/', [TeacherQuestionsController::class, 'index'])->name('index');
         Route::get('/create', [TeacherQuestionsController::class, 'create'])->name('create');

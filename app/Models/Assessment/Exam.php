@@ -29,6 +29,7 @@ class Exam extends Model
         'randomize_questions',
         'require_fullscreen',
         'show_results',
+        'results_released_at',
         'is_published',
         'is_archived'
     ];
@@ -39,6 +40,7 @@ class Exam extends Model
         'randomize_questions' => 'boolean',
         'require_fullscreen' => 'boolean',
         'show_results' => 'boolean',
+        'results_released_at' => 'datetime',
         'is_published' => 'boolean',
         'is_archived' => 'boolean',
         'duration' => 'integer',

@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('total_score')->nullable();
             $table->enum('status', ['in_progress', 'submitted', 'graded', 'expired'])->default('in_progress');
             $table->json('answers')->nullable();
+            $table->json('manual_grades')->nullable();
             $table->timestamps();
 
             $table->unique(['exam_id', 'student_id']);

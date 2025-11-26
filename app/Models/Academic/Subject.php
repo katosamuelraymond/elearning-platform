@@ -3,6 +3,7 @@
 namespace App\Models\Academic;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Subject extends Model
@@ -12,30 +13,56 @@ class Subject extends Model
         'code',
         'description',
         'type',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
     ];
 
     /**
-     * Get the classes for the subject.
+     * Get the topics for the subject.
      */
-    public function classes(): BelongsToMany
+    public function topics(): HasMany
     {
-        return $this->belongsToMany(SchoolClass::class, 'class_subject', 'subject_id', 'class_id')
-                    ->withPivot('periods_per_week')
-                    ->withTimestamps();
-    }
-
-    public function exams()
-    {
-        return $this->hasMany(\App\Models\Assessment\Exam::class);
+        return $this->hasMany(Topic::class);
     }
 
     /**
-     * Scope for compulsory subjects.
+     * Get the active topics for the subject.
+     */
+    public function activeTopics(): HasMany
+    {
+        return $this->hasMany(Topic::class)->where('is_active', true);
+    }
+
+    /**
+     * Get the classes that study this subject.
+     */
+    public function classes(): BelongsToMany
+    {
+        return $this->belongsToMany(SchoolClass::class, 'class_subject')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the resources for this subject.
+     */
+    public function resources(): HasMany
+    {
+        return $this->hasThrough(Resource::class, Topic::class);
+    }
+
+    /**
+     * Scope for active subjects
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope for compulsory subjects
      */
     public function scopeCompulsory($query)
     {
@@ -43,7 +70,7 @@ class Subject extends Model
     }
 
     /**
-     * Scope for optional subjects.
+     * Scope for optional subjects
      */
     public function scopeOptional($query)
     {
@@ -51,18 +78,19 @@ class Subject extends Model
     }
 
     /**
-     * Scope for elective subjects.
+     * Get subject with its active topics count
      */
-    public function scopeElective($query)
+    public function getActiveTopicsCountAttribute(): int
     {
-        return $query->where('type', 'elective');
+        return $this->activeTopics()->count();
     }
 
     /**
-     * Scope for active subjects.
+     * Check if subject can be deleted
      */
-    public function scopeActive($query)
+    public function getCanDeleteAttribute(): bool
     {
-        return $query->where('is_active', true);
+        return $this->topics()->count() === 0 &&
+            $this->classes()->count() === 0;
     }
 }

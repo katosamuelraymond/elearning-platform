@@ -12,18 +12,36 @@
                     <p class="text-gray-600 dark:text-gray-300 mt-2">
                         {{ $exam->subject->name }} • {{ $exam->class->name }}
                     </p>
+                    @if(auth()->user()->isTeacher())
+                        <p class="text-sm text-blue-600 dark:text-blue-400 mt-1">Teacher View</p>
+                    @else
+                        <p class="text-sm text-purple-600 dark:text-purple-400 mt-1">Admin View</p>
+                    @endif
                 </div>
                 <div class="flex space-x-3">
-                    <a href="{{ route('admin.exams.index') }}"
-                       class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center">
-                        <i class="fas fa-arrow-left mr-2"></i>
-                        Back to Exams
-                    </a>
-                    <a href="{{ route('admin.exams.edit', $exam) }}"
-                       class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center">
-                        <i class="fas fa-edit mr-2"></i>
-                        Edit Exam
-                    </a>
+                    @if(auth()->user()->isTeacher())
+                        <a href="{{ route('teacher.exams.index') }}"
+                           class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back to Exams
+                        </a>
+                        <a href="{{ route('teacher.exams.edit', $exam) }}"
+                           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center">
+                            <i class="fas fa-edit mr-2"></i>
+                            Edit Exam
+                        </a>
+                    @else
+                        <a href="{{ route('admin.exams.index') }}"
+                           class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back to Exams
+                        </a>
+                        <a href="{{ route('admin.exams.edit', $exam) }}"
+                           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center">
+                            <i class="fas fa-edit mr-2"></i>
+                            Edit Exam
+                        </a>
+                    @endif
                 </div>
             </div>
 
@@ -153,6 +171,62 @@
                             </div>
                         @endif
                     </div>
+
+                    <!-- Result Release Control -->
+                    @if($exam->attempts()->where('status', 'graded')->exists())
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Result Release Control</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                                Control when students can see their detailed exam results.
+                            </p>
+
+                            @if($exam->show_results && $exam->results_released_at)
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                        <span class="text-green-700 dark:text-green-300">
+                    Results released to students on {{ $exam->results_released_at->format('M j, Y g:i A') }}
+                </span>
+                                    </div>
+                                    <form action="{{ route('teacher.exams.withdraw-results', $exam) }}" method="POST" id="withdraw-form">
+                                        @csrf
+                                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm" onclick="debugForm('withdraw')">
+                                            <i class="fas fa-eye-slash mr-1"></i>Withdraw Results
+                                        </button>
+                                    </form>
+                                </div>
+                            @else
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-clock text-yellow-500 mr-2"></i>
+                                        <span class="text-yellow-700 dark:text-yellow-300">
+                    Results not released to students
+                </span>
+                                    </div>
+                                    <form action="{{ route('teacher.exams.release-results', $exam) }}" method="POST" id="release-form">
+                                        @csrf
+                                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm" onclick="debugForm('release')">
+                                            <i class="fas fa-eye mr-1"></i>Release Results
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
+                        </div>
+
+                        <script>
+                            function debugForm(action) {
+                                const form = document.getElementById(action + '-form');
+                                console.log('Form action:', form.action);
+                                console.log('Form method:', form.method);
+                                console.log('Exam ID:', {{ $exam->id }});
+
+                                // Add a small delay to see the console before form submission
+                                setTimeout(() => {
+                                    console.log('Form submitted for:', action);
+                                }, 100);
+                            }
+                        </script>
+                    @endif
 
                     <!-- Questions Section - Enhanced -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
@@ -332,10 +406,17 @@
                                 <i class="fas fa-inbox text-4xl text-gray-400 dark:text-gray-500 mb-4"></i>
                                 <p class="text-gray-500 dark:text-gray-400 text-lg">No questions added to this exam yet</p>
                                 <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Add questions from the question bank or create new ones</p>
-                                <a href="{{ route('admin.exams.edit', $exam) }}" class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
-                                    <i class="fas fa-plus mr-2"></i>
-                                    Add Questions
-                                </a>
+                                @if(auth()->user()->isTeacher())
+                                    <a href="{{ route('teacher.exams.edit', $exam) }}" class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                                        <i class="fas fa-plus mr-2"></i>
+                                        Add Questions
+                                    </a>
+                                @else
+                                    <a href="{{ route('admin.exams.edit', $exam) }}" class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
+                                        <i class="fas fa-plus mr-2"></i>
+                                        Add Questions
+                                    </a>
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -390,34 +471,65 @@
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
                         <div class="space-y-3">
-                            <a href="{{ route('admin.exams.attempts.index', $exam) }}"
-                               class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                <i class="fas fa-users mr-2"></i>
-                                View Attempts ({{ $exam->attempts->count() }})
-                            </a>
+                            @if(auth()->user()->isTeacher())
+                                <a href="{{ route('teacher.exams.attempts', $exam) }}"
+                                   class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-users mr-2"></i>
+                                    View Attempts ({{ $exam->attempts->count() }})
+                                </a>
 
-                            <form action="{{ route('admin.exams.toggle-publish', $exam) }}" method="POST" class="w-full">
-                                @csrf
-                                @method('PATCH')
-                                <button type="submit"
-                                        class="w-full {{ $exam->is_published ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                    <i class="fas fa-eye{{ $exam->is_published ? '-slash' : '' }} mr-2"></i>
-                                    {{ $exam->is_published ? 'Unpublish Exam' : 'Publish Exam' }}
-                                </button>
-                            </form>
+                                <form action="{{ route('teacher.exams.toggle-publish', $exam) }}" method="POST" class="w-full">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit"
+                                            class="w-full {{ $exam->is_published ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                        <i class="fas fa-eye{{ $exam->is_published ? '-slash' : '' }} mr-2"></i>
+                                        {{ $exam->is_published ? 'Unpublish Exam' : 'Publish Exam' }}
+                                    </button>
+                                </form>
 
-                            <a href="{{ route('admin.exams.edit', $exam) }}"
-                               class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                <i class="fas fa-edit mr-2"></i>
-                                Edit Exam
-                            </a>
+                                <a href="{{ route('teacher.exams.edit', $exam) }}"
+                                   class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-edit mr-2"></i>
+                                    Edit Exam
+                                </a>
 
-                            <!-- Print/Export Button -->
-                            <a href="{{ route('admin.exams.print', $exam) }}" target="_blank"
-                               class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                                <i class="fas fa-print mr-2"></i>
-                                Print Exam
-                            </a>
+                                <!-- Print/Export Button -->
+                                <a href="{{ route('teacher.exams.print', $exam) }}" target="_blank"
+                                   class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-print mr-2"></i>
+                                    Print Exam
+                                </a>
+                            @else
+                                <a href="{{ route('admin.exams.attempts', $exam) }}"
+                                   class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-users mr-2"></i>
+                                    View Attempts ({{ $exam->attempts->count() }})
+                                </a>
+
+                                <form action="{{ route('admin.exams.toggle-publish', $exam) }}" method="POST" class="w-full">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit"
+                                            class="w-full {{ $exam->is_published ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                        <i class="fas fa-eye{{ $exam->is_published ? '-slash' : '' }} mr-2"></i>
+                                        {{ $exam->is_published ? 'Unpublish Exam' : 'Publish Exam' }}
+                                    </button>
+                                </form>
+
+                                <a href="{{ route('admin.exams.edit', $exam) }}"
+                                   class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-edit mr-2"></i>
+                                    Edit Exam
+                                </a>
+
+                                <!-- Print/Export Button -->
+                                <a href="{{ route('admin.exams.print', $exam) }}" target="_blank"
+                                   class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                                    <i class="fas fa-print mr-2"></i>
+                                    Print Exam
+                                </a>
+                            @endif
                         </div>
                     </div>
 
@@ -486,8 +598,8 @@
                                                 {{ ucfirst($attempt->status) }}
                                             </span>
                                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                @if($attempt->score)
-                                                    {{ $attempt->score }}/{{ $exam->total_marks }}
+                                                @if($attempt->total_score)
+                                                    {{ $attempt->total_score }}/{{ $exam->total_marks }}
                                                 @else
                                                     In progress
                                                 @endif
@@ -498,9 +610,15 @@
 
                                 @if($exam->attempts->count() > 5)
                                     <div class="text-center">
-                                        <a href="{{ route('admin.exams.attempts.index', $exam) }}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
-                                            View all {{ $exam->attempts->count() }} attempts
-                                        </a>
+                                        @if(auth()->user()->isTeacher())
+                                            <a href="{{ route('teacher.exams.attempts', $exam) }}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
+                                                View all {{ $exam->attempts->count() }} attempts
+                                            </a>
+                                        @else
+                                            <a href="{{ route('admin.exams.attempts', $exam) }}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
+                                                View all {{ $exam->attempts->count() }} attempts
+                                            </a>
+                                        @endif
                                     </div>
                                 @endif
                             </div>

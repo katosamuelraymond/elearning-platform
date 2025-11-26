@@ -13,6 +13,7 @@ use App\Http\Controllers\Modules\Grades\AdminGradesController;
 use App\Http\Controllers\Modules\Resources\AdminResourcesController;
 use App\Http\Controllers\Modules\Settings\AdminSettingsController;
 use App\Http\Controllers\Modules\Users\AdminUsersController;
+use App\Http\Controllers\Modules\Topics\AdminTopicsController;
 
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
@@ -87,7 +88,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/{assignment}/download', [AdminAssignmentsController::class, 'download'])->name('download');
     });
 
-    // Exams - COMPLETE CRUD OPERATIONS (Updated)
+    // Exams - COMPLETE CRUD OPERATIONS (Fixed)
     Route::prefix('exams')->name('exams.')->group(function () {
         // CRUD Routes
         Route::get('/', [AdminExamsController::class, 'index'])->name('index');
@@ -100,6 +101,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('/{exam}', [AdminExamsController::class, 'update']);
         Route::delete('/{exam}', [AdminExamsController::class, 'destroy'])->name('destroy');
 
+        // Print routes
         Route::get('/{exam}/print', [AdminExamsController::class, 'print'])->name('print');
         Route::get('/{exam}/print-pdf', [AdminExamsController::class, 'printPDF'])->name('print-pdf');
 
@@ -107,9 +109,17 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('/{exam}/toggle-publish', [AdminExamsController::class, 'togglePublish'])->name('toggle-publish');
         Route::patch('/{exam}/toggle-archive', [AdminExamsController::class, 'toggleArchive'])->name('toggle-archive');
 
-        // Exam Attempts Management
-        Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts.index');
+        // Exam Attempts Management - FIXED: Remove duplicates and use consistent naming
+        Route::get('/{exam}/attempts', [AdminExamsController::class, 'attempts'])->name('attempts');
         Route::get('/{exam}/attempts/{attempt}', [AdminExamsController::class, 'showAttempt'])->name('attempts.show');
+
+        // Grading routes
+        Route::post('/{exam}/attempts/{attempt}/update-score', [AdminExamsController::class, 'updateScore'])->name('attempts.update-score');
+        Route::post('/{exam}/attempts/{attempt}/bulk-update-grades', [AdminExamsController::class, 'bulkUpdateGrades'])->name('attempts.bulk-update-grades');
+
+        // Results management
+        Route::post('/{exam}/release-results', [AdminExamsController::class, 'releaseResults'])->name('release-results');
+        Route::post('/{exam}/withdraw-results', [AdminExamsController::class, 'withdrawResults'])->name('withdraw-results');
     });
 
     // Questions
@@ -125,9 +135,27 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     });
 
     // Quizzes
+    // Quizzes - COMPLETE CRUD OPERATIONS
+    // Quizzes
     Route::prefix('quizzes')->name('quizzes.')->group(function () {
         Route::get('/', [AdminQuizzesController::class, 'index'])->name('index');
+        Route::get('/question-bank', [AdminQuizzesController::class, 'getQuestionBank'])->name('question-bank');
         Route::get('/create', [AdminQuizzesController::class, 'create'])->name('create');
+        Route::post('/', [AdminQuizzesController::class, 'store'])->name('store');
+        Route::get('/{quiz}', [AdminQuizzesController::class, 'show'])->name('show');
+        Route::get('/{quiz}/edit', [AdminQuizzesController::class, 'edit'])->name('edit');
+        Route::put('/{quiz}', [AdminQuizzesController::class, 'update'])->name('update');
+        Route::patch('/{quiz}', [AdminQuizzesController::class, 'update']);
+        Route::delete('/{quiz}', [AdminQuizzesController::class, 'destroy'])->name('destroy');
+
+        // Quiz Actions
+        Route::patch('/{quiz}/toggle-publish', [AdminQuizzesController::class, 'togglePublish'])->name('toggle-publish');
+
+        // Quiz Attempts Management - FIXED ROUTES
+        Route::get('/{quiz}/attempts', [AdminQuizzesController::class, 'attempts'])->name('attempts');
+
+        // Use explicit parameter name for attempt
+        Route::get('/{quiz}/attempts/{quizAttempt}', [AdminQuizzesController::class, 'showAttempt'])->name('attempts.show');
     });
 
     // Grades
@@ -136,10 +164,32 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/student/{student}', [AdminGradesController::class, 'studentReport'])->name('student.report');
     });
 
-    // Resources
+    //resources
     Route::prefix('resources')->name('resources.')->group(function () {
         Route::get('/', [AdminResourcesController::class, 'index'])->name('index');
         Route::get('/upload', [AdminResourcesController::class, 'create'])->name('upload');
+        Route::post('/', [AdminResourcesController::class, 'store'])->name('store');
+        Route::get('/{resource}', [AdminResourcesController::class, 'show'])->name('show');
+        Route::get('/{resource}/download', [AdminResourcesController::class, 'download'])->name('download');
+        Route::patch('/{resource}/toggle-status', [AdminResourcesController::class, 'toggleStatus'])->name('toggle-status');
+
+        // AJAX routes
+        Route::get('/topics/by-subject', [AdminResourcesController::class, 'getTopicsBySubject'])->name('topics.by-subject');
+    });
+
+    // Topics Management
+    Route::prefix('topics')->name('topics.')->group(function () {
+        Route::get('/', [AdminTopicsController::class, 'index'])->name('index');
+        Route::get('/create', [AdminTopicsController::class, 'create'])->name('create');
+        Route::post('/', [AdminTopicsController::class, 'store'])->name('store');
+        Route::get('/{topic}', [AdminTopicsController::class, 'show'])->name('show');
+        Route::get('/{topic}/edit', [AdminTopicsController::class, 'edit'])->name('edit');
+        Route::put('/{topic}', [AdminTopicsController::class, 'update'])->name('update');
+        Route::delete('/{topic}', [AdminTopicsController::class, 'destroy'])->name('destroy');
+        Route::patch('/{topic}/toggle-status', [AdminTopicsController::class, 'toggleStatus'])->name('toggle-status');
+
+        // AJAX routes
+        Route::get('/by-subject', [AdminTopicsController::class, 'getBySubject'])->name('by-subject');
     });
 
     // Users Management

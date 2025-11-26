@@ -21,6 +21,7 @@ return new class extends Migration
             $table->text('explanation')->nullable();
             $table->enum('difficulty', ['easy', 'medium', 'hard'])->default('medium');
             $table->decimal('points', 5, 2)->default(1.00);
+            $table->boolean('is_bank_question')->default(true);
             $table->boolean('is_active')->default(true);
 
             // ADDED: Fields to store non-MCQ correct answers/rubrics/details

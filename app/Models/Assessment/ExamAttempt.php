@@ -18,13 +18,15 @@ class ExamAttempt extends Model
         'time_spent',
         'total_score',
         'status',
-        'answers'
+        'answers',
+        'manual_grades',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'submitted_at' => 'datetime',
         'answers' => 'array',
+        'manual_grades' => 'array', // ADD THIS LINE - CRITICAL!
         'time_spent' => 'integer',
         'total_score' => 'integer'
     ];

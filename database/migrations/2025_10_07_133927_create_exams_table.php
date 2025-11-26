@@ -29,6 +29,7 @@ return new class extends Migration
             $table->boolean('randomize_questions')->default(false);
             $table->boolean('require_fullscreen')->default(false);
             $table->boolean('show_results')->default(true);
+            $table->timestamp('results_released_at')->nullable();
             $table->boolean('is_published')->default(false);
             $table->boolean('is_archived')->default(false); // Added this line
             $table->timestamps();

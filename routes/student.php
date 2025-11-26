@@ -62,11 +62,21 @@ Route::middleware('auth')->prefix('student')->name('student.')->group(function (
 
         // View Results
         Route::get('/{exam}/results/{attempt}', [StudentExamsController::class, 'results'])->name('results');
+
+        Route::get('/exams/{exam}/poll-status', [StudentExamsController::class, 'pollStatus'])->name('poll-status');
     });
 
     Route::prefix('quizzes')->name('quizzes.')->group(function () {
         Route::get('/', [StudentQuizzesController::class, 'index'])->name('index');
-        Route::get('/take/{quiz}', [StudentQuizzesController::class, 'show'])->name('take');
+        Route::get('/upcoming', [StudentQuizzesController::class, 'upcoming'])->name('upcoming');
+        Route::get('/completed', [StudentQuizzesController::class, 'completed'])->name('completed');
+        Route::get('/progress', [StudentQuizzesController::class, 'progress'])->name('progress');
+        Route::get('/{quiz}', [StudentQuizzesController::class, 'show'])->name('show');
+        Route::post('/{quiz}/start', [StudentQuizzesController::class, 'start'])->name('start');
+        Route::get('/attempt/{attempt}', [StudentQuizzesController::class, 'attempt'])->name('attempt');
+        Route::post('/attempt/{attempt}/answer', [StudentQuizzesController::class, 'saveAnswer'])->name('save-answer');
+        Route::post('/attempt/{attempt}/submit', [StudentQuizzesController::class, 'submit'])->name('submit');
+        Route::get('/result/{attempt}', [StudentQuizzesController::class, 'result'])->name('result');
     });
 
     Route::prefix('grades')->name('grades.')->group(function () {

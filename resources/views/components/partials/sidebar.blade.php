@@ -231,7 +231,7 @@
                         />
 
                         <!-- ADDED: STUDENT ASSIGNMENTS SECTION -->
-                        <x-partials.sidebar-collapsible label="Student Management" icon="fas fa-user-graduate text-cyan-500 dark:text-cyan-400">
+                        <x-partials.sidebar-collapsible label="Student" icon="fas fa-user-graduate text-cyan-500 dark:text-cyan-400">
                             <x-partials.sidebar-link
                                 href="{{ route('admin.student-assignments.index') }}"
                                 label="Class Assignments"
@@ -247,7 +247,7 @@
                         </x-partials.sidebar-collapsible>
 
                         <!-- TEACHER ASSIGNMENTS SECTION -->
-                        <x-partials.sidebar-collapsible label="Teacher Management" icon="fas fa-chalkboard-teacher text-indigo-500 dark:text-indigo-400">
+                        <x-partials.sidebar-collapsible label="Teacher " icon="fas fa-chalkboard-teacher text-indigo-500 dark:text-indigo-400">
                             <x-partials.sidebar-link
                                 href="{{ route('admin.teacher-assignments.index') }}"
                                 label="Class Assignments"
